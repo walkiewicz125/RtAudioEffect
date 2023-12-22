@@ -159,17 +159,6 @@ impl UserTexture {
     }
 }
 
-pub struct CallbackFn {
-    pub func: Box<dyn Fn() + Send + Sync + 'static>, // maybe in the future pass some useful data to the callback?
-}
-
-impl CallbackFn {
-    pub fn new<F: Fn() + Send + Sync + 'static>(callback: F) -> Self {
-        let f = Box::new(callback);
-        Self { func: f }
-    }
-}
-
 pub struct Painter {
     program: GLuint,
 

@@ -1,177 +1,182 @@
-use std::time::Instant;
+use std::{sync::mpsc::Receiver, time::Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use egui::{load::SizedTexture, vec2, Color32, Image, ImageSource, Pos2, Rect};
-use glfw::Context;
+use egui::{vec2, Pos2, Rect};
+use glfw::{Context, Glfw, WindowEvent};
 mod egui_glfw;
-mod painter;
-mod triangle;
+mod glfw_painter;
 
 const SCREEN_WIDTH: u32 = 800;
 const SCREEN_HEIGHT: u32 = 600;
-const PIC_WIDTH: i32 = 320;
-const PIC_HEIGHT: i32 = 192;
 
 fn main() {
     println!("Hello, world!");
 
-    let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
-    glfw.window_hint(glfw::WindowHint::ContextVersion(4, 3));
-    glfw.window_hint(glfw::WindowHint::OpenGlProfile(
-        glfw::OpenGlProfileHint::Core,
-    ));
-    glfw.window_hint(glfw::WindowHint::DoubleBuffer(true));
-    glfw.window_hint(glfw::WindowHint::Resizable(true));
+    let mut app_context = AppContext::new();
+    app_context.run();
 
-    let (mut window, events) = glfw
-        .create_window(
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT,
-            "Egui in GLFW!",
-            glfw::WindowMode::Windowed,
-        )
-        .expect("Failed to create GLFW window");
+    println!("Goodbye, world!");
+}
 
-    window.set_char_polling(true);
-    window.set_cursor_pos_polling(true);
-    window.set_key_polling(true);
-    window.set_mouse_button_polling(true);
-    window.set_size_polling(true);
-    window.make_current();
+struct AppContext {
+    glfw_context: Glfw,
+    window: glfw::Window,
+    events: Receiver<(f64, WindowEvent)>,
+    painter: glfw_painter::Painter,
+    egui_context: egui::Context,
+    egui_input_state: egui_glfw::EguiInputState,
+}
 
-    gl::load_with(|s| window.get_proc_address(s));
+impl AppContext {
+    pub fn new() -> Self {
+        let mut glfw_context = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+        glfw_context.window_hint(glfw::WindowHint::ContextVersion(4, 3));
+        glfw_context.window_hint(glfw::WindowHint::OpenGlProfile(
+            glfw::OpenGlProfileHint::Core,
+        ));
+        glfw_context.window_hint(glfw::WindowHint::DoubleBuffer(true));
+        glfw_context.window_hint(glfw::WindowHint::Resizable(true));
 
-    let mut painter = painter::Painter::new(&mut window);
-    let egui_ctx = egui::Context::default();
+        let (mut window, events) = AppContext::create_window(&mut glfw_context);
 
-    let (width, height) = window.get_framebuffer_size();
-    let native_pixels_per_point = window.get_content_scale().0;
-    let mut egui_input_state = egui_glfw::EguiInputState::new(egui::RawInput {
-        screen_rect: Some(Rect::from_min_size(
-            Pos2::new(0f32, 0f32),
-            vec2(width as f32, height as f32) / native_pixels_per_point,
-        )),
-        ..Default::default() // todo: add pixels_per_point
-    });
+        window.set_char_polling(true);
+        window.set_cursor_pos_polling(true);
+        window.set_key_polling(true);
+        window.set_mouse_button_polling(true);
+        window.set_size_polling(true);
+        window.make_current();
 
-    let start_time = Instant::now();
-    let srgb = vec![Color32::BLACK; (PIC_HEIGHT * PIC_WIDTH) as usize];
+        gl::load_with(|s| window.get_proc_address(s));
 
-    let plot_tex_id = painter.new_user_texture(
-        (PIC_WIDTH as usize, PIC_HEIGHT as usize),
-        &srgb,
-        egui::TextureFilter::Linear,
-    );
+        let (painter, egui_context, egui_input_state) = AppContext::initialize_egui(&mut window);
 
-    let mut sine_shift = 0f32;
-    let mut amplitude = 50f32;
-    let mut test_str =
-        "A text box to write in. Cut, copy, paste commands are available.".to_owned();
-
-    let triangle = triangle::Triangle::new();
-    let mut quit = false;
-
-    while !window.should_close() {
-        egui_input_state.input.time = Some(start_time.elapsed().as_secs_f64());
-        egui_ctx.begin_frame(egui_input_state.input.take());
-
-        // egui_input_state.input.viewport().native_pixels_per_point = Some(native_pixels_per_point);
-
-        unsafe {
-            gl::ClearColor(0.455, 0.302, 0.663, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
-
-        triangle.draw();
-
-        let mut srgba: Vec<Color32> = Vec::new();
-        let mut angle = 0f32;
-
-        for y in 0..PIC_HEIGHT {
-            for x in 0..PIC_WIDTH {
-                srgba.push(Color32::BLACK);
-                if y == PIC_HEIGHT - 1 {
-                    let y = amplitude * (angle * std::f32::consts::PI / 180f32 + sine_shift).sin();
-                    let y = PIC_HEIGHT as f32 / 2f32 - y;
-                    srgba[(y as i32 * PIC_WIDTH + x) as usize] = Color32::YELLOW;
-                    angle += 360f32 / PIC_WIDTH as f32;
-                }
-            }
-        }
-        sine_shift += 0.1f32;
-
-        painter.update_user_texture_data(&plot_tex_id, &srgba);
-
-        egui::Window::new("Egui with GLFW").show(&egui_ctx, |ui| {
-            egui::TopBottomPanel::top("Top").show(&egui_ctx, |ui| {
-                ui.menu_button("File", |ui| {
-                    {
-                        let _ = ui.button("test 1");
-                    }
-                    ui.separator();
-                    {
-                        let _ = ui.button("test 2");
-                    }
-                });
-            });
-
-            //Image just needs a texture id reference, so we just pass it the texture id that was returned to us
-            //when we previously initialized the texture.
-            ui.add(Image::from_texture(SizedTexture::new(plot_tex_id, vec2(PIC_WIDTH as f32, PIC_HEIGHT as f32))));
-            ui.separator();
-            ui.label("A simple sine wave plotted onto a GL texture then blitted to an egui managed Image.");
-            ui.label(" ");
-            ui.text_edit_multiline(&mut test_str);
-            ui.label(" ");
-            ui.add(egui::Slider::new(&mut amplitude, 0.0..=50.0).text("Amplitude"));
-            ui.label(" ");
-            if ui.button("Quit").clicked() {
-                quit = true;
-            }
-        });
-
-        let egui::FullOutput {
-            platform_output,
-            textures_delta,
-            shapes,
-            pixels_per_point: native_pixels_per_point,
-            viewport_output,
-        } = egui_ctx.end_frame();
-
-        //Handle cut, copy text from egui
-        if !platform_output.copied_text.is_empty() {
-            egui_glfw::copy_to_clipboard(&mut egui_input_state, platform_output.copied_text);
-        }
-
-        //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
-        //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
-        //drawing calls with it.
-        //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-
-        let clipped_shapes = egui_ctx.tessellate(shapes, native_pixels_per_point);
-        painter.paint_and_update_textures(1.0, &clipped_shapes, &textures_delta);
-
-        for (_, event) in glfw::flush_messages(&events) {
-            match event {
-                glfw::WindowEvent::Close => window.set_should_close(true),
-                glfw::WindowEvent::Size(width, height) => {
-                    painter.set_size(width as _, height as _);
-                    egui_glfw::handle_event(event, &mut egui_input_state);
-                }
-                _ => {
-                    println!("{:?}", event);
-                    egui_glfw::handle_event(event, &mut egui_input_state);
-                }
-            }
-        }
-        window.swap_buffers();
-        glfw.poll_events();
-
-        if quit {
-            break;
+        AppContext {
+            glfw_context,
+            window,
+            events,
+            painter,
+            egui_context,
+            egui_input_state,
         }
     }
-    println!("Goodbye, world!");
+
+    pub fn run(&mut self) {
+        let mut quit = false;
+        let start_time = Instant::now();
+
+        while !self.window.should_close() {
+            self.egui_input_state.input.time = Some(start_time.elapsed().as_secs_f64());
+            self.egui_context
+                .begin_frame(self.egui_input_state.input.take());
+
+            // egui_input_state.input.viewport().native_pixels_per_point = Some(native_pixels_per_point);
+
+            unsafe {
+                gl::ClearColor(0.455, 0.302, 0.663, 1.0);
+                gl::Clear(gl::COLOR_BUFFER_BIT);
+            }
+
+            egui::Window::new("Egui with GLFW").show(&self.egui_context, |ui| {
+                egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
+                    ui.menu_button("File", |ui| {
+                        {
+                            let _ = ui.button("test 1");
+                        }
+                        ui.separator();
+                        {
+                            let _ = ui.button("test 2");
+                        }
+                    });
+                });
+
+                if ui.button("Quit").clicked() {
+                    quit = true;
+                }
+            });
+
+            let egui::FullOutput {
+                platform_output,
+                textures_delta,
+                shapes,
+                pixels_per_point: native_pixels_per_point,
+                viewport_output: _,
+            } = self.egui_context.end_frame();
+
+            //Handle cut, copy text from egui
+            if !platform_output.copied_text.is_empty() {
+                egui_glfw::copy_to_clipboard(
+                    &mut self.egui_input_state,
+                    platform_output.copied_text,
+                );
+            }
+
+            //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
+            //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
+            //drawing calls with it.
+            //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
+
+            let clipped_shapes = self
+                .egui_context
+                .tessellate(shapes, native_pixels_per_point);
+            self.painter
+                .paint_and_update_textures(1.0, &clipped_shapes, &textures_delta);
+
+            for (_, event) in glfw::flush_messages(&self.events) {
+                match event {
+                    glfw::WindowEvent::Close => self.window.set_should_close(true),
+                    glfw::WindowEvent::Size(width, height) => {
+                        self.painter.set_size(width as _, height as _);
+                        egui_glfw::handle_event(event, &mut self.egui_input_state);
+                    }
+                    _ => {
+                        println!("{:?}", event);
+                        egui_glfw::handle_event(event, &mut self.egui_input_state);
+                    }
+                }
+            }
+            self.window.swap_buffers();
+            self.glfw_context.poll_events();
+
+            if quit {
+                break;
+            }
+        }
+    }
+
+    fn create_window(glfw_context: &mut Glfw) -> (glfw::Window, Receiver<(f64, WindowEvent)>) {
+        glfw_context
+            .create_window(
+                SCREEN_WIDTH,
+                SCREEN_HEIGHT,
+                "Egui in GLFW!",
+                glfw::WindowMode::Windowed,
+            )
+            .expect("Failed to create GLFW window")
+    }
+
+    fn initialize_egui(
+        window: &mut glfw::Window,
+    ) -> (
+        glfw_painter::Painter,
+        egui::Context,
+        egui_glfw::EguiInputState,
+    ) {
+        let painter = glfw_painter::Painter::new(window);
+        let egui_ctx = egui::Context::default();
+
+        let (width, height) = window.get_framebuffer_size();
+        let native_pixels_per_point = window.get_content_scale().0;
+
+        let egui_input_state = egui_glfw::EguiInputState::new(egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(
+                Pos2::new(0f32, 0f32),
+                vec2(width as f32, height as f32) / native_pixels_per_point,
+            )),
+            ..Default::default() // todo: add pixels_per_point
+        });
+
+        (painter, egui_ctx, egui_input_state)
+    }
 }
 
 fn test_audio() {
