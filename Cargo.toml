@@ -2,7 +2,20 @@
 name = "rt_audio_efect"
 version = "0.1.0"
 edition = "2021"
+include = ["**/*.rs"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cpal = "0.15.*"
+gl = "0.14"
+glfw = "0.52"
+egui = "0.24"
+
+[dependencies.clipboard]
+package = "cli-clipboard"
+version = "0.4"
+optional = true
+
+[features]
+default = ["clipboard"]
