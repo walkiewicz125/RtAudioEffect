@@ -1,13 +1,16 @@
 use std::{sync::mpsc::Receiver, time::Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use egui::{vec2, Pos2, Rect};
+use egui::{panel::Side, vec2, Align2, FontId, Id, Pos2, Rect, TextStyle, Vec2};
+use glam::Mat4;
 use glfw::{Context, Glfw, WindowEvent};
+use plot::{waveplot::WaveplotInstancBuffer, waveplot_renderer::WaveplotRenderer};
 mod egui_glfw;
 mod glfw_painter;
+mod plot;
 
-const SCREEN_WIDTH: u32 = 800;
-const SCREEN_HEIGHT: u32 = 600;
+const SCREEN_WIDTH: u32 = 1920;
+const SCREEN_HEIGHT: u32 = 1080;
 
 fn main() {
     println!("Hello, world!");
@@ -50,6 +53,27 @@ impl AppContext {
 
         let (painter, egui_context, egui_input_state) = AppContext::initialize_egui(&mut window);
 
+        let waveplot_buffer = WaveplotInstancBuffer::default();
+
+        let mut waveplot_renderer = WaveplotRenderer::new_from_string(
+            include_str!("plot/resources/waveplot.vert"),
+            include_str!("plot/resources/waveplot.frag"),
+        )
+        .unwrap();
+
+        let resolution = (SCREEN_WIDTH, SCREEN_HEIGHT);
+        let view_matrix = Mat4::orthographic_rh(
+            -(resolution.0 as f32) / 2.0,
+            (resolution.0 as f32) / 2.0,
+            -(resolution.1 as f32) / 2.0,
+            (resolution.1 as f32) / 2.0,
+            -1.0,
+            1.0,
+        );
+
+        waveplot_renderer.set_view_uniform(view_matrix);
+        waveplot_buffer.render(&mut waveplot_renderer);
+
         AppContext {
             glfw_context,
             window,
@@ -64,36 +88,43 @@ impl AppContext {
         let mut quit = false;
         let start_time = Instant::now();
 
+        self.egui_context.style_mut(|x| {
+            x.text_styles.insert(
+                TextStyle::Body,
+                FontId::new(20.0, egui::FontFamily::Proportional),
+            );
+            x.text_styles.insert(
+                TextStyle::Button,
+                FontId::new(20.0, egui::FontFamily::Proportional),
+            );
+        });
+
         while !self.window.should_close() {
             self.egui_input_state.input.time = Some(start_time.elapsed().as_secs_f64());
             self.egui_context
                 .begin_frame(self.egui_input_state.input.take());
-
-            // egui_input_state.input.viewport().native_pixels_per_point = Some(native_pixels_per_point);
 
             unsafe {
                 gl::ClearColor(0.455, 0.302, 0.663, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT);
             }
 
-            egui::Window::new("Egui with GLFW").show(&self.egui_context, |ui| {
-                egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
-                    ui.menu_button("File", |ui| {
-                        {
-                            let _ = ui.button("test 1");
-                        }
-                        ui.separator();
-                        {
-                            let _ = ui.button("test 2");
-                        }
-                    });
+            egui::SidePanel::new(Side::Right, Id::new("panel"))
+                .show(&self.egui_context, |ui| ui.label("Test"));
+            egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
+                ui.menu_button("File", |ui| {
+                    {
+                        let _ = ui.button("test 1");
+                    }
+                    ui.separator();
+                    {
+                        let _ = ui.button("test 2");
+                    }
                 });
-
-                if ui.button("Quit").clicked() {
-                    quit = true;
-                }
             });
-
+            let native_pixels_per_point = self.window.get_content_scale().0;
+            self.egui_context
+                .set_pixels_per_point(native_pixels_per_point);
             let egui::FullOutput {
                 platform_output,
                 textures_delta,
@@ -176,6 +207,12 @@ impl AppContext {
         });
 
         (painter, egui_ctx, egui_input_state)
+    }
+}
+
+impl Default for AppContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

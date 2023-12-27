@@ -395,6 +395,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.24.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
+
+[[package]]
 name = "glfw"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -885,6 +891,7 @@ dependencies = [
  "cpal",
  "egui",
  "gl",
+ "glam",
  "glfw",
 ]
 
