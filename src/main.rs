@@ -1,10 +1,10 @@
 use std::{sync::mpsc::Receiver, time::Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use egui::{panel::Side, vec2, Align2, FontId, Id, Pos2, Rect, TextStyle, Vec2};
+use egui::{panel::Side, vec2, FontId, Id, Pos2, Rect, TextStyle};
 use glam::Mat4;
 use glfw::{Context, Glfw, WindowEvent};
-use plot::{barplot::BarplotInstancBuffer, barplot_renderer::BarplotRenderer};
+use plot::{barplot_shader::BarplotShader, storage_buffer::StorageBuffer};
 mod egui_glfw;
 mod glfw_painter;
 mod plot;
@@ -28,6 +28,41 @@ struct AppContext {
     painter: glfw_painter::Painter,
     egui_context: egui::Context,
     egui_input_state: egui_glfw::EguiInputState,
+    bar_spectrum_renderer: BarSpectrumRenderer,
+}
+
+struct BarSpectrumRenderer {
+    shader: BarplotShader,
+    storage: StorageBuffer,
+}
+
+impl BarSpectrumRenderer {
+    fn new() -> BarSpectrumRenderer {
+        let shader = BarplotShader::new_from_string(
+            include_str!("plot/resources/barplot.vert"),
+            include_str!("plot/resources/barplot.frag"),
+        )
+        .expect(&format!(
+            "Failed to create BarplotShader: {}, {}.",
+            "plot/resources/barplot.vert", "plot/resources/barplot.vert"
+        ));
+
+        let storage = StorageBuffer::new();
+        BarSpectrumRenderer { shader, storage }
+    }
+
+    fn set_view(&self, view_matrix: Mat4, client_size: (u32, u32)) {
+        self.shader.set_projection(view_matrix);
+        self.shader.set_client_size(client_size);
+    }
+
+    fn set_spectrum(&mut self, spectrum_data: &[f32]) {
+        self.storage.store_array(spectrum_data);
+    }
+
+    fn render(&self) {
+        self.shader.draw(&self.storage);
+    }
 }
 
 impl AppContext {
@@ -53,26 +88,25 @@ impl AppContext {
 
         let (painter, egui_context, egui_input_state) = AppContext::initialize_egui(&mut window);
 
-        let waveplot_buffer = BarplotInstancBuffer::default();
-
-        let mut waveplot_renderer = BarplotRenderer::new_from_string(
-            include_str!("plot/resources/barplot.vert"),
-            include_str!("plot/resources/barplot.frag"),
-        )
-        .unwrap();
-
         let resolution = (SCREEN_WIDTH, SCREEN_HEIGHT);
+        let mut bar_spectrum_renderer = BarSpectrumRenderer::new();
+
         let view_matrix = Mat4::orthographic_rh(
-            -(resolution.0 as f32) / 2.0,
-            (resolution.0 as f32) / 2.0,
-            -(resolution.1 as f32) / 2.0,
-            (resolution.1 as f32) / 2.0,
+            0.0,
+            resolution.0 as f32,
+            0.0,
+            resolution.1 as f32,
             -1.0,
             1.0,
         );
+        bar_spectrum_renderer.set_view(view_matrix, resolution);
+        let mut spectrum: Vec<f32> = vec![0.0; 1024];
 
-        waveplot_renderer.set_view_uniform(view_matrix);
-        waveplot_buffer.render(&mut waveplot_renderer);
+        for i in 0..1024 {
+            spectrum[i] = i as f32 / 1024.0;
+        }
+
+        bar_spectrum_renderer.set_spectrum(spectrum.as_slice());
 
         AppContext {
             glfw_context,
@@ -81,11 +115,11 @@ impl AppContext {
             painter,
             egui_context,
             egui_input_state,
+            bar_spectrum_renderer,
         }
     }
 
     pub fn run(&mut self) {
-        let mut quit = false;
         let start_time = Instant::now();
 
         self.egui_context.style_mut(|x| {
@@ -108,6 +142,8 @@ impl AppContext {
                 gl::ClearColor(0.455, 0.302, 0.663, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT);
             }
+
+            self.bar_spectrum_renderer.render();
 
             egui::SidePanel::new(Side::Right, Id::new("panel"))
                 .show(&self.egui_context, |ui| ui.label("Test"));
@@ -167,10 +203,6 @@ impl AppContext {
             }
             self.window.swap_buffers();
             self.glfw_context.poll_events();
-
-            if quit {
-                break;
-            }
         }
     }
 
