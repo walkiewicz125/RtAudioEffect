@@ -5,7 +5,7 @@ use super::helpers::*;
 use super::primitive_base::{InstanceBuffer, PrimitiveVerticesBuffer};
 use super::shader_holder::*;
 
-pub struct WaveplotRenderer {
+pub struct BarplotRenderer {
     // openGl objects ids:
     program_shader_id: u32,
     vertex_array_id: u32,
@@ -18,8 +18,8 @@ pub struct WaveplotRenderer {
     vertices_count: i32,
 }
 
-impl WaveplotRenderer {
-    pub fn new_from_string(vertex_shader: &str, fragment_shader: &str) -> Option<WaveplotRenderer> {
+impl BarplotRenderer {
+    pub fn new_from_string(vertex_shader: &str, fragment_shader: &str) -> Option<BarplotRenderer> {
         let vertex = ShaderHolder::new_from_string(vertex_shader, ShaderType::VertexShader);
         let fragment = ShaderHolder::new_from_string(fragment_shader, ShaderType::FragmentShader);
 
@@ -56,7 +56,7 @@ impl WaveplotRenderer {
             gl::GenBuffers(1, &mut view_uniform_id);
         }
 
-        Some(WaveplotRenderer {
+        Some(BarplotRenderer {
             program_shader_id: program_id,
             vertex_array_id,
             vertices_buffer_id,
@@ -151,7 +151,7 @@ impl WaveplotRenderer {
     }
 }
 
-impl Drop for WaveplotRenderer {
+impl Drop for BarplotRenderer {
     fn drop(&mut self) {
         unsafe { gl::DeleteProgram(self.program_shader_id) };
     }

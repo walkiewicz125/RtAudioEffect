@@ -11,7 +11,6 @@ uniform mat4 projection;
 void main()
 {
     vec2 new_position = vertex_pos;
-    new_position.x *= 0.001;
     new_position.x += bar_position_and_size.x;
     new_position.y *= bar_position_and_size.y;
 

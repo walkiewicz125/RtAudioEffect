@@ -3,47 +3,47 @@ use std::{ffi::c_void, mem::size_of};
 use glam::Vec2;
 
 use super::{
+    barplot_renderer::BarplotRenderer,
     primitive_base::{self, InstanceBuffer, VertexAttribute},
-    waveplot_renderer::WaveplotRenderer,
 };
 
-pub struct WaveplotInstancBuffer {
+pub struct BarplotInstancBuffer {
     instances: Vec<Vec2>,
 }
 
-impl WaveplotInstancBuffer {
+impl BarplotInstancBuffer {
     pub fn update(&mut self, new_instances: Vec<Vec2>) {
         self.instances = new_instances;
     }
 
-    pub fn default() -> WaveplotInstancBuffer {
-        WaveplotInstancBuffer { instances: vec![] }
+    pub fn default() -> BarplotInstancBuffer {
+        BarplotInstancBuffer { instances: vec![] }
     }
 
-    pub(crate) fn render(&self, waveplot_renderer: &mut WaveplotRenderer) {
+    pub(crate) fn render(&self, waveplot_renderer: &mut BarplotRenderer) {
         waveplot_renderer.buffer_instances(self);
         waveplot_renderer.draw_instances();
     }
 }
 
-impl WaveplotInstancBuffer {
+impl BarplotInstancBuffer {
     const STRIDE: i32 = size_of::<Vec2>() as i32;
     const ATTRIB_OFFSET_BAR_POS_SIZE: usize = 0;
-    const WAVEPLOT_SHADER_ATTRIBUTES: [VertexAttribute; 1] = [VertexAttribute {
+    const BARPLOT_SHADER_ATTRIBUTES: [VertexAttribute; 1] = [VertexAttribute {
         index: 2,
         size: 2,
-        stride: WaveplotInstancBuffer::STRIDE,
-        offset_pointer: WaveplotInstancBuffer::ATTRIB_OFFSET_BAR_POS_SIZE as *const _,
+        stride: BarplotInstancBuffer::STRIDE,
+        offset_pointer: BarplotInstancBuffer::ATTRIB_OFFSET_BAR_POS_SIZE as *const _,
     }];
 
-    pub(crate) fn new() -> WaveplotInstancBuffer {
-        WaveplotInstancBuffer::default()
+    pub(crate) fn new() -> BarplotInstancBuffer {
+        BarplotInstancBuffer::default()
     }
 }
 
-impl InstanceBuffer for WaveplotInstancBuffer {
+impl InstanceBuffer for BarplotInstancBuffer {
     fn get_vertex_attributes(&self) -> &[VertexAttribute] {
-        WaveplotInstancBuffer::WAVEPLOT_SHADER_ATTRIBUTES.as_slice()
+        BarplotInstancBuffer::BARPLOT_SHADER_ATTRIBUTES.as_slice()
     }
 
     fn get_data(&self) -> *const c_void {

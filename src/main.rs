@@ -4,7 +4,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use egui::{panel::Side, vec2, Align2, FontId, Id, Pos2, Rect, TextStyle, Vec2};
 use glam::Mat4;
 use glfw::{Context, Glfw, WindowEvent};
-use plot::{waveplot::WaveplotInstancBuffer, waveplot_renderer::WaveplotRenderer};
+use plot::{barplot::BarplotInstancBuffer, barplot_renderer::BarplotRenderer};
 mod egui_glfw;
 mod glfw_painter;
 mod plot;
@@ -53,11 +53,11 @@ impl AppContext {
 
         let (painter, egui_context, egui_input_state) = AppContext::initialize_egui(&mut window);
 
-        let waveplot_buffer = WaveplotInstancBuffer::default();
+        let waveplot_buffer = BarplotInstancBuffer::default();
 
-        let mut waveplot_renderer = WaveplotRenderer::new_from_string(
-            include_str!("plot/resources/waveplot.vert"),
-            include_str!("plot/resources/waveplot.frag"),
+        let mut waveplot_renderer = BarplotRenderer::new_from_string(
+            include_str!("plot/resources/barplot.vert"),
+            include_str!("plot/resources/barplot.frag"),
         )
         .unwrap();
 
