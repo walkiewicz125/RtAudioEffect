@@ -1,13 +1,16 @@
 use std::{sync::mpsc::Receiver, time::Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use egui::{panel::Side, vec2, FontId, Id, Pos2, Rect, TextStyle};
+
 use glam::Mat4;
 use glfw::{Context, Glfw, WindowEvent};
-use plot::{barplot_shader::BarplotShader, storage_buffer::StorageBuffer};
-mod egui_glfw;
-mod glfw_painter;
+
 mod plot;
+use plot::BarSpectrumRenderer;
+
+mod glfw_egui;
+use egui::{panel::Side, vec2, FontId, Id, Pos2, Rect, TextStyle};
+use glfw_egui::{egui_glfw, glfw_painter};
 
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
@@ -31,40 +34,6 @@ struct AppContext {
     bar_spectrum_renderer: BarSpectrumRenderer,
 }
 
-struct BarSpectrumRenderer {
-    shader: BarplotShader,
-    storage: StorageBuffer,
-}
-
-impl BarSpectrumRenderer {
-    fn new() -> BarSpectrumRenderer {
-        let shader = BarplotShader::new_from_string(
-            include_str!("plot/resources/barplot.vert"),
-            include_str!("plot/resources/barplot.frag"),
-        )
-        .expect(&format!(
-            "Failed to create BarplotShader: {}, {}.",
-            "plot/resources/barplot.vert", "plot/resources/barplot.vert"
-        ));
-
-        let storage = StorageBuffer::new();
-        BarSpectrumRenderer { shader, storage }
-    }
-
-    fn set_view(&self, view_matrix: Mat4, client_size: (u32, u32)) {
-        self.shader.set_projection(view_matrix);
-        self.shader.set_client_size(client_size);
-    }
-
-    fn set_spectrum(&mut self, spectrum_data: &[f32]) {
-        self.storage.store_array(spectrum_data);
-    }
-
-    fn render(&self) {
-        self.shader.draw(&self.storage);
-    }
-}
-
 impl AppContext {
     pub fn new() -> Self {
         let mut glfw_context = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
@@ -74,6 +43,7 @@ impl AppContext {
         ));
         glfw_context.window_hint(glfw::WindowHint::DoubleBuffer(true));
         glfw_context.window_hint(glfw::WindowHint::Resizable(true));
+        glfw_context.window_hint(glfw::WindowHint::Samples(Some(8)));
 
         let (mut window, events) = AppContext::create_window(&mut glfw_context);
 
@@ -85,7 +55,7 @@ impl AppContext {
         window.make_current();
 
         gl::load_with(|s| window.get_proc_address(s));
-
+        unsafe { gl::Enable(gl::MULTISAMPLE) };
         let (painter, egui_context, egui_input_state) = AppContext::initialize_egui(&mut window);
 
         let resolution = (SCREEN_WIDTH, SCREEN_HEIGHT);

@@ -1,5 +1,5 @@
-pub mod barplot_shader;
-mod helpers;
-pub mod primitive_base;
-mod shader_holder;
-pub mod storage_buffer;
+mod bar_spectrum_renderer;
+mod barplot_shader;
+mod primitives;
+
+pub use bar_spectrum_renderer::BarSpectrumRenderer;
