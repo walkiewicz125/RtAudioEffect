@@ -7,7 +7,7 @@ STEPS:
 - [x] 1. generate test bars. For example: 1024 bars.
 - [x] 2. make it draw with current shader.
 - [x] 3. Improve current shader. Regardles position/index and size;
-- [ ] 4. Clean up code and refactor to make it more usable.
+- [x] 4. Clean up code and refactor to make it more usable.
 #### milestone 2
 - [ ] 5. Calculate FFT using existing crates.
 - [ ] 6. Pass FFT data to renderer.
