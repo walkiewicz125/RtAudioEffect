@@ -9,8 +9,12 @@ STEPS:
 - [x] 3. Improve current shader. Regardles position/index and size;
 - [x] 4. Clean up code and refactor to make it more usable.
 #### milestone 2
-- [ ] 5. Calculate FFT using existing crates.
-- [ ] 6. Pass FFT data to renderer.
+- [x] 5. Calculate FFT using existing crates.
+- [x] 6. Pass FFT data to renderer.
+#### milestone 3
+- [ ] 7. Add windowing function before FFT
+- [ ] 8. Refactor. Extract FFT size to higher layer. Add to ui.
+- [ ] 9. Clean up code/refactor
 
 
 ===================================================================

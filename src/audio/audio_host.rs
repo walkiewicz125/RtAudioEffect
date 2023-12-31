@@ -1,37 +1,33 @@
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{
+    mpsc::{self, Receiver, Sender},
+    Arc,
+};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     HostId, InputCallbackInfo, Stream,
 };
+use egui::mutex::Mutex;
 
 struct AudioStreamer {
-    tx_channel: Sender<Vec<f32>>,
+    buffer: Arc<Mutex<Vec<f32>>>,
 }
 impl AudioStreamer {
-    fn data_callback(&self, data: Vec<f32>, callback_info: &InputCallbackInfo) {
-        match self.tx_channel.send(data) {
-            Ok(_) => println!(
-                "Succeeded to send data. Timestamp: {:#?}",
-                callback_info.timestamp()
-            ),
-            Err(_) => {
-                eprintln!("Failed to send data")
-            }
-        }
+    fn data_callback(&mut self, mut data: Vec<f32>, callback_info: &InputCallbackInfo) {
+        self.buffer.lock().append(&mut data);
     }
 }
 
-struct AudioHost {
+pub struct AudioHost {
     host_id: HostId,
     sample_rate: u32,
     channels: u16,
     stream: Stream,
-    rx_channel: Receiver<Vec<f32>>,
+    buffer: Arc<Mutex<Vec<f32>>>,
 }
 
 impl AudioHost {
-    fn new(host_id: HostId) -> Result<AudioHost, &'static str> {
+    pub fn new(host_id: HostId) -> Result<AudioHost, &'static str> {
         let Ok(host) = cpal::host_from_id(host_id) else {
             return Err("Failed to find Host");
         };
@@ -53,8 +49,10 @@ impl AudioHost {
             return Err("Unsupported format");
         };
 
-        let (tx_channel, rx_channel) = mpsc::channel::<Vec<f32>>();
-        let streamer = AudioStreamer { tx_channel };
+        let buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
+        let mut streamer = AudioStreamer {
+            buffer: buffer.clone(),
+        };
         let Ok(stream) = device.build_input_stream(
             &config.into(),
             move |data, info: &_| streamer.data_callback(data.to_vec(), info),
@@ -69,7 +67,7 @@ impl AudioHost {
             sample_rate,
             channels,
             stream,
-            rx_channel,
+            buffer,
         })
     }
 
@@ -84,10 +82,18 @@ impl AudioHost {
             eprintln!("{:#?}", err);
         }
     }
+
+    fn read_data(&mut self) -> Vec<f32> {
+        let data = self.buffer.lock().clone();
+        self.buffer.lock().clear();
+        data
+    }
 }
 
 pub struct AudioSource {
     host: AudioHost,
+    left_channel_buffer: Vec<f32>,
+    right_channel_buffer: Vec<f32>,
 }
 
 impl AudioSource {
@@ -99,7 +105,11 @@ impl AudioSource {
         }
 
         match AudioHost::new(available_hosts[0]) {
-            Ok(host) => Ok(AudioSource { host }),
+            Ok(host) => Ok(AudioSource {
+                host,
+                left_channel_buffer: vec![],
+                right_channel_buffer: vec![],
+            }),
             Err(err) => return Err(String::from(err)),
         }
     }
@@ -109,5 +119,36 @@ impl AudioSource {
 
     pub fn stop(&self) {
         self.host.stop();
+    }
+
+    pub fn get_last_left_channel(&mut self, sample_count: i32) -> Vec<f32> {
+        let data = self.host.read_data();
+        for i in 0..data.len() {
+            if i % 2 == 0 {
+                self.left_channel_buffer.push(data[i]);
+            } else {
+                self.right_channel_buffer.push(data[i]);
+            }
+        }
+
+        if self.left_channel_buffer.len() > sample_count as usize {
+            self.left_channel_buffer = self
+                .left_channel_buffer
+                .iter()
+                .rev()
+                .take(sample_count as usize)
+                .map(|x| x.clone())
+                .collect();
+        }
+        if self.right_channel_buffer.len() > sample_count as usize {
+            self.right_channel_buffer = self
+                .right_channel_buffer
+                .iter()
+                .rev()
+                .take(sample_count as usize)
+                .map(|x| x.clone())
+                .collect();
+        }
+        self.left_channel_buffer.clone()
     }
 }

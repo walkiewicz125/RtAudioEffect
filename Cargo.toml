@@ -8,6 +8,8 @@ include = ["**/*.rs"]
 
 [dependencies]
 cpal = "0.15.*"
+rustfft = "6.1.*"
+
 gl = "0.14"
 glam = "0.24.2"
 glfw = "0.52"

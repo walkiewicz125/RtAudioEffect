@@ -2,8 +2,10 @@ use std::{sync::mpsc::Receiver, time::Instant};
 
 use egui::{panel::Side, vec2, FontId, Id, Pos2, Rect, TextStyle};
 use glfw::{Context, Glfw, WindowEvent};
+use rustfft::{num_complex::Complex, FftPlanner};
 
 use crate::{
+    audio::AudioSource,
     glfw_egui::{egui_glfw, glfw_painter},
     plot::BarSpectrumRenderer,
 };
@@ -50,13 +52,40 @@ impl RtAudioEffect {
     }
 
     pub fn run(&mut self) {
+        let mut audio =
+            AudioSource::new_default_loopback().expect("Failed to create default loopback stream");
+        audio.start();
+
+        let mut planner = FftPlanner::<f32>::new();
+        let fft = planner.plan_fft_forward(10240);
+
         while !self.window.should_close() {
             unsafe {
                 gl::ClearColor(0.455, 0.302, 0.663, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT);
             }
 
-            self.bar_spectrum_renderer.render();
+            let last_data = audio.get_last_left_channel(10240);
+
+            let mut data_in_complex: Vec<Complex<f32>> = last_data
+                .iter()
+                .map(|value| Complex {
+                    re: value.clone(),
+                    im: 0.0,
+                })
+                .collect();
+
+            if data_in_complex.len() >= 10240 {
+                fft.process(&mut data_in_complex);
+
+                let magnitude: Vec<f32> = data_in_complex
+                    .iter()
+                    .map(|number| number.norm() / 10240.0)
+                    .collect();
+
+                self.bar_spectrum_renderer.set_spectrum(&magnitude);
+                self.bar_spectrum_renderer.render();
+            }
 
             self.update_ui();
 
