@@ -1,6 +1,9 @@
-use std::sync::{
-    mpsc::{self, Receiver, Sender},
-    Arc,
+use std::{
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc,
+    },
+    time::Duration,
 };
 
 use cpal::{
@@ -9,12 +12,65 @@ use cpal::{
 };
 use egui::mutex::Mutex;
 
+struct AudioBuffer {
+    sample_rate: u32,
+    channels: u16,
+    buffer_duration: Duration,
+    buffer_duration_in_samples: usize,
+
+    buffers: Vec<Vec<f32>>,
+}
+
+impl AudioBuffer {
+    fn new(sample_rate: u32, channels: u16, buffer_duration: Duration) -> AudioBuffer {
+        let buffer_duration_in_samples: usize =
+            (sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
+        AudioBuffer {
+            sample_rate,
+            channels,
+            buffer_duration,
+            buffer_duration_in_samples,
+            buffers: vec![vec![0.0; buffer_duration_in_samples]; channels as usize],
+        }
+    }
+
+    fn store(&mut self, data: Vec<f32>) {
+        for i in 0..data.len() {
+            let channel = i % self.channels as usize;
+            self.buffers[channel].push(data[i]);
+        }
+
+        for buffer in &mut self.buffers {
+            if buffer.len() > self.buffer_duration_in_samples {
+                let oversize = buffer.len() - self.buffer_duration_in_samples;
+                buffer.drain(0..oversize);
+            }
+            assert!(
+                buffer.len() <= self.buffer_duration_in_samples,
+                "buffer didn't shrink"
+            );
+        }
+    }
+
+    fn get_channel_last(&self, channel: u16, duration: Duration) -> Vec<f32> {
+        if duration <= self.buffer_duration {
+            let samples = (self.sample_rate as f32 * duration.as_secs_f32()) as usize;
+
+            return self.buffers[channel as usize]
+                [self.buffer_duration_in_samples - samples..self.buffer_duration_in_samples]
+                .to_vec();
+        } else {
+            return self.buffers[channel as usize].to_vec();
+        }
+    }
+}
+
 struct AudioStreamer {
-    buffer: Arc<Mutex<Vec<f32>>>,
+    buffer: Arc<Mutex<AudioBuffer>>,
 }
 impl AudioStreamer {
-    fn data_callback(&mut self, mut data: Vec<f32>, callback_info: &InputCallbackInfo) {
-        self.buffer.lock().append(&mut data);
+    fn data_callback(&mut self, data: Vec<f32>, callback_info: &InputCallbackInfo) {
+        self.buffer.lock().store(data);
     }
 }
 
@@ -23,7 +79,7 @@ pub struct AudioHost {
     sample_rate: u32,
     channels: u16,
     stream: Stream,
-    buffer: Arc<Mutex<Vec<f32>>>,
+    buffer: Arc<Mutex<AudioBuffer>>,
 }
 
 impl AudioHost {
@@ -49,7 +105,11 @@ impl AudioHost {
             return Err("Unsupported format");
         };
 
-        let buffer = Arc::new(Mutex::new(Vec::<f32>::new()));
+        let buffer = Arc::new(Mutex::new(AudioBuffer::new(
+            sample_rate,
+            channels,
+            Duration::from_secs_f32(1.0),
+        )));
         let mut streamer = AudioStreamer {
             buffer: buffer.clone(),
         };
@@ -83,17 +143,15 @@ impl AudioHost {
         }
     }
 
-    fn read_data(&mut self) -> Vec<f32> {
-        let data = self.buffer.lock().clone();
-        self.buffer.lock().clear();
+    fn read_data(&mut self, duration: Duration) -> Vec<f32> {
+        let guard = self.buffer.lock();
+        let data = guard.get_channel_last(0, duration);
         data
     }
 }
 
 pub struct AudioSource {
     host: AudioHost,
-    left_channel_buffer: Vec<f32>,
-    right_channel_buffer: Vec<f32>,
 }
 
 impl AudioSource {
@@ -105,11 +163,7 @@ impl AudioSource {
         }
 
         match AudioHost::new(available_hosts[0]) {
-            Ok(host) => Ok(AudioSource {
-                host,
-                left_channel_buffer: vec![],
-                right_channel_buffer: vec![],
-            }),
+            Ok(host) => Ok(AudioSource { host }),
             Err(err) => return Err(String::from(err)),
         }
     }
@@ -122,33 +176,7 @@ impl AudioSource {
     }
 
     pub fn get_last_left_channel(&mut self, sample_count: i32) -> Vec<f32> {
-        let data = self.host.read_data();
-        for i in 0..data.len() {
-            if i % 2 == 0 {
-                self.left_channel_buffer.push(data[i]);
-            } else {
-                self.right_channel_buffer.push(data[i]);
-            }
-        }
-
-        if self.left_channel_buffer.len() > sample_count as usize {
-            self.left_channel_buffer = self
-                .left_channel_buffer
-                .iter()
-                .rev()
-                .take(sample_count as usize)
-                .map(|x| x.clone())
-                .collect();
-        }
-        if self.right_channel_buffer.len() > sample_count as usize {
-            self.right_channel_buffer = self
-                .right_channel_buffer
-                .iter()
-                .rev()
-                .take(sample_count as usize)
-                .map(|x| x.clone())
-                .collect();
-        }
-        self.left_channel_buffer.clone()
+        let duration = Duration::from_secs_f32(sample_count as f32 / self.host.sample_rate as f32);
+        self.host.read_data(duration)
     }
 }

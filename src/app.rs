@@ -55,9 +55,15 @@ impl RtAudioEffect {
         let mut audio =
             AudioSource::new_default_loopback().expect("Failed to create default loopback stream");
         audio.start();
-
+        let size = 48000 / 10;
         let mut planner = FftPlanner::<f32>::new();
-        let fft = planner.plan_fft_forward(10240);
+        let fft = planner.plan_fft_forward(size);
+
+        let window_fun = apodize::hanning_iter(size)
+            .map(|v| v as f32)
+            .collect::<Vec<f32>>();
+
+        let mut windowed_data: Vec<Complex<f32>> = vec![Complex { re: 0.0, im: 0.0 }; size];
 
         while !self.window.should_close() {
             unsafe {
@@ -65,22 +71,20 @@ impl RtAudioEffect {
                 gl::Clear(gl::COLOR_BUFFER_BIT);
             }
 
-            let last_data = audio.get_last_left_channel(10240);
+            let last_data = audio.get_last_left_channel(size as i32);
 
-            let mut data_in_complex: Vec<Complex<f32>> = last_data
-                .iter()
-                .map(|value| Complex {
-                    re: value.clone(),
-                    im: 0.0,
-                })
-                .collect();
+            if last_data.len() >= size {
+                for i in 0..size {
+                    windowed_data[i].re = last_data[i] * window_fun[i];
+                    windowed_data[i].im = 0.0;
+                }
 
-            if data_in_complex.len() >= 10240 {
-                fft.process(&mut data_in_complex);
+                fft.process(&mut windowed_data);
 
-                let magnitude: Vec<f32> = data_in_complex
+                let magnitude: Vec<f32> = windowed_data
                     .iter()
-                    .map(|number| number.norm() / 10240.0)
+                    .map(|number| number.norm() / size as f32)
+                    .take(size / 2)
                     .collect();
 
                 self.bar_spectrum_renderer.set_spectrum(&magnitude);

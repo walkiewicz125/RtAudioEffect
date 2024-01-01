@@ -12,7 +12,7 @@ STEPS:
 - [x] 5. Calculate FFT using existing crates.
 - [x] 6. Pass FFT data to renderer.
 #### milestone 3
-- [ ] 7. Add windowing function before FFT
+- [x] 7. Add windowing function before FFT
 - [ ] 8. Refactor. Extract FFT size to higher layer. Add to ui.
 - [ ] 9. Clean up code/refactor
 
