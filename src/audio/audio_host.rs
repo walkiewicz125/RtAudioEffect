@@ -1,76 +1,20 @@
-use std::{
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
+use super::{audio_buffer::AudioBuffer, stream_analyzer::StreamAnalyzer};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     HostId, InputCallbackInfo, Stream,
 };
 use egui::mutex::Mutex;
 
-struct AudioBuffer {
-    sample_rate: u32,
-    channels: u16,
-    buffer_duration: Duration,
-    buffer_duration_in_samples: usize,
-
-    buffers: Vec<Vec<f32>>,
-}
-
-impl AudioBuffer {
-    fn new(sample_rate: u32, channels: u16, buffer_duration: Duration) -> AudioBuffer {
-        let buffer_duration_in_samples: usize =
-            (sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
-        AudioBuffer {
-            sample_rate,
-            channels,
-            buffer_duration,
-            buffer_duration_in_samples,
-            buffers: vec![vec![0.0; buffer_duration_in_samples]; channels as usize],
-        }
-    }
-
-    fn store(&mut self, data: Vec<f32>) {
-        for i in 0..data.len() {
-            let channel = i % self.channels as usize;
-            self.buffers[channel].push(data[i]);
-        }
-
-        for buffer in &mut self.buffers {
-            if buffer.len() > self.buffer_duration_in_samples {
-                let oversize = buffer.len() - self.buffer_duration_in_samples;
-                buffer.drain(0..oversize);
-            }
-            assert!(
-                buffer.len() <= self.buffer_duration_in_samples,
-                "buffer didn't shrink"
-            );
-        }
-    }
-
-    fn get_channel_last(&self, channel: u16, duration: Duration) -> Vec<f32> {
-        if duration <= self.buffer_duration {
-            let samples = (self.sample_rate as f32 * duration.as_secs_f32()) as usize;
-
-            return self.buffers[channel as usize]
-                [self.buffer_duration_in_samples - samples..self.buffer_duration_in_samples]
-                .to_vec();
-        } else {
-            return self.buffers[channel as usize].to_vec();
-        }
-    }
-}
-
 struct AudioStreamer {
     buffer: Arc<Mutex<AudioBuffer>>,
+    analyzer: Arc<Mutex<StreamAnalyzer>>,
 }
 impl AudioStreamer {
     fn data_callback(&mut self, data: Vec<f32>, callback_info: &InputCallbackInfo) {
         self.buffer.lock().store(data);
+        self.analyzer.lock().analyze(&mut self.buffer.lock());
     }
 }
 
@@ -80,10 +24,15 @@ pub struct AudioHost {
     channels: u16,
     stream: Stream,
     buffer: Arc<Mutex<AudioBuffer>>,
+    analyzer: Arc<Mutex<StreamAnalyzer>>,
+
+    spectrum_width: usize,
+    buffer_duration: Duration,
+    buffer_duration_in_samples: usize,
 }
 
 impl AudioHost {
-    pub fn new(host_id: HostId) -> Result<AudioHost, &'static str> {
+    pub fn new(host_id: HostId, spectrum_width: usize) -> Result<AudioHost, &'static str> {
         let Ok(host) = cpal::host_from_id(host_id) else {
             return Err("Failed to find Host");
         };
@@ -105,13 +54,16 @@ impl AudioHost {
             return Err("Unsupported format");
         };
 
+        let buffer_duration = Duration::from_secs_f32(1.0);
         let buffer = Arc::new(Mutex::new(AudioBuffer::new(
             sample_rate,
             channels,
-            Duration::from_secs_f32(1.0),
+            buffer_duration,
         )));
+        let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(spectrum_width)));
         let mut streamer = AudioStreamer {
             buffer: buffer.clone(),
+            analyzer: analyzer.clone(),
         };
         let Ok(stream) = device.build_input_stream(
             &config.into(),
@@ -128,6 +80,11 @@ impl AudioHost {
             channels,
             stream,
             buffer,
+            spectrum_width,
+            buffer_duration,
+            buffer_duration_in_samples: (sample_rate as f32 * buffer_duration.as_secs_f32())
+                as usize,
+            analyzer,
         })
     }
 
@@ -143,30 +100,49 @@ impl AudioHost {
         }
     }
 
-    fn read_data(&mut self, duration: Duration) -> Vec<f32> {
-        let guard = self.buffer.lock();
-        let data = guard.get_channel_last(0, duration);
-        data
+    fn peek_channel(&mut self, channel: u16, duration: Duration) -> Vec<f32> {
+        let data = self.buffer.lock().peek_channel(channel);
+        if duration <= self.buffer_duration {
+            let samples = (self.sample_rate as f32 * duration.as_secs_f32()) as usize;
+
+            return data
+                [self.buffer_duration_in_samples - samples..self.buffer_duration_in_samples]
+                .to_vec();
+        } else {
+            return data;
+        }
+    }
+
+    fn peek_spectrum(&self) -> Vec<f32> {
+        self.analyzer.lock().get_mean_spectrum()
+    }
+    fn peek_spectrum_2(&self) -> Vec<f32> {
+        self.analyzer.lock().get_spectrum()
     }
 }
 
-pub struct AudioSource {
+pub struct AudioAnalyzysSource {
     host: AudioHost,
+    spectrum_width: usize,
 }
 
-impl AudioSource {
-    pub fn new_default_loopback() -> Result<AudioSource, String> {
+impl AudioAnalyzysSource {
+    pub fn new_default_loopback(spectrum_width: usize) -> Result<AudioAnalyzysSource, String> {
         let available_hosts = cpal::available_hosts();
 
         if available_hosts.is_empty() {
             return Err(String::from("No host devices found"));
         }
 
-        match AudioHost::new(available_hosts[0]) {
-            Ok(host) => Ok(AudioSource { host }),
+        match AudioHost::new(available_hosts[0], spectrum_width) {
+            Ok(host) => Ok(AudioAnalyzysSource {
+                host,
+                spectrum_width,
+            }),
             Err(err) => return Err(String::from(err)),
         }
     }
+
     pub fn start(&self) {
         self.host.start();
     }
@@ -175,8 +151,16 @@ impl AudioSource {
         self.host.stop();
     }
 
-    pub fn get_last_left_channel(&mut self, sample_count: i32) -> Vec<f32> {
-        let duration = Duration::from_secs_f32(sample_count as f32 / self.host.sample_rate as f32);
-        self.host.read_data(duration)
+    pub fn get_last_left_channel(&mut self) -> Vec<f32> {
+        let duration =
+            Duration::from_secs_f32(self.spectrum_width as f32 / self.host.sample_rate as f32);
+        self.host.peek_channel(0, duration)
+    }
+
+    pub fn get_last_left_channel_spectrum(&mut self) -> Vec<f32> {
+        self.host.peek_spectrum()
+    }
+    pub fn get_last_left_channel_spectrum_2(&mut self) -> Vec<f32> {
+        self.host.peek_spectrum_2()
     }
 }

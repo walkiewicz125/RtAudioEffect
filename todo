@@ -13,8 +13,11 @@ STEPS:
 - [x] 6. Pass FFT data to renderer.
 #### milestone 3
 - [x] 7. Add windowing function before FFT
-- [ ] 8. Refactor. Extract FFT size to higher layer. Add to ui.
-- [ ] 9. Clean up code/refactor
+- [x] 8. Create stream analyzer. With overlap option.
+- [x] 9. Little refactor of code. FFT calculation present on AudioCapture side.
+- [x] 10. Render present spectrum over mean spectrum.
+- [ ] 11. Refactor. Extract spectrum related option to higher layer. Add to ui.
+- [ ] 12. Clean up code/refactor
 
 
 ===================================================================
