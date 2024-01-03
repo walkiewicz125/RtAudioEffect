@@ -113,10 +113,10 @@ impl AudioHost {
         }
     }
 
-    fn peek_spectrum(&self) -> Vec<f32> {
+    fn peek_mean_spectrum(&self) -> Vec<f32> {
         self.analyzer.lock().get_mean_spectrum()
     }
-    fn peek_spectrum_2(&self) -> Vec<f32> {
+    fn peek_spectrum(&self) -> Vec<f32> {
         self.analyzer.lock().get_spectrum()
     }
 }
@@ -157,10 +157,10 @@ impl AudioAnalyzysSource {
         self.host.peek_channel(0, duration)
     }
 
+    pub fn get_last_left_channel_mean_spectrum(&mut self) -> Vec<f32> {
+        self.host.peek_mean_spectrum()
+    }
     pub fn get_last_left_channel_spectrum(&mut self) -> Vec<f32> {
         self.host.peek_spectrum()
-    }
-    pub fn get_last_left_channel_spectrum_2(&mut self) -> Vec<f32> {
-        self.host.peek_spectrum_2()
     }
 }

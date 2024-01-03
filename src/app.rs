@@ -66,12 +66,14 @@ impl RtAudioEffect {
                 gl::Clear(gl::COLOR_BUFFER_BIT);
             }
 
-            let magnitude: Vec<f32> = audio.get_last_left_channel_spectrum();
+            let magnitude: Vec<f32> = audio.get_last_left_channel_mean_spectrum();
             self.bar_spectrum_renderer.set_spectrum(&magnitude);
+            self.bar_spectrum_renderer.set_style(1);
             self.bar_spectrum_renderer.render();
 
-            let magnitude: Vec<f32> = audio.get_last_left_channel_spectrum_2();
+            let magnitude: Vec<f32> = audio.get_last_left_channel_spectrum();
             self.bar_spectrum_renderer.set_spectrum(&magnitude);
+            self.bar_spectrum_renderer.set_style(0);
             self.bar_spectrum_renderer.render();
 
             self.update_ui();

@@ -38,6 +38,10 @@ impl BarSpectrumRenderer {
         self.storage.store_array(spectrum_data);
     }
 
+    pub fn set_style(&self, style_number: u32) {
+        self.shader.set_style(style_number);
+    }
+
     pub fn render(&self) {
         self.shader.draw(&self.storage);
     }

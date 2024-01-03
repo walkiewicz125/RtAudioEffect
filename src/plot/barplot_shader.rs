@@ -7,8 +7,9 @@ pub struct BarplotShader {
     // openGl objects ids:
     shader_program: ShaderProgram,
     vertex_array_id: u32,
-    view_uniform_id: u32,
-    view_uniform_id_2: u32,
+    projection_id: u32,
+    client_size_id: u32,
+    style_id: u32,
 
     // application internal
     vertices_count: i32,
@@ -26,34 +27,37 @@ impl BarplotShader {
         ));
 
         let mut vertex_array_id = 0;
-        let mut view_uniform_id = 0;
-        let mut view_uniform_id_2 = 0;
+        let mut projection_id = 0;
+        let mut client_size_id = 0;
+        let mut style_id = 0;
 
         unsafe {
             gl::GenVertexArrays(1, &mut vertex_array_id);
-            gl::GenBuffers(1, &mut view_uniform_id);
-            gl::GenBuffers(1, &mut view_uniform_id_2);
+            gl::GenBuffers(1, &mut projection_id);
+            gl::GenBuffers(1, &mut client_size_id);
+            gl::GenBuffers(1, &mut style_id);
         }
 
         Some(BarplotShader {
             shader_program,
             vertex_array_id,
-            view_uniform_id,
-            view_uniform_id_2,
+            projection_id,
+            client_size_id,
+            style_id,
             vertices_count: 6,
         })
     }
 
     pub fn set_projection(&self, view_matrix: Mat4) {
         unsafe {
-            gl::BindBuffer(gl::UNIFORM_BUFFER, self.view_uniform_id);
+            gl::BindBuffer(gl::UNIFORM_BUFFER, self.projection_id);
             gl::BufferData(
                 gl::UNIFORM_BUFFER,
                 size_of::<Mat4>() as isize,
                 view_matrix.to_cols_array().as_ptr().cast(),
                 gl::DYNAMIC_DRAW,
             );
-            gl::BindBufferBase(gl::UNIFORM_BUFFER, 0, self.view_uniform_id);
+            gl::BindBufferBase(gl::UNIFORM_BUFFER, 0, self.projection_id);
         }
     }
 
@@ -63,14 +67,28 @@ impl BarplotShader {
             y: client_size.1 as f32,
         };
         unsafe {
-            gl::BindBuffer(gl::UNIFORM_BUFFER, self.view_uniform_id_2);
+            gl::BindBuffer(gl::UNIFORM_BUFFER, self.client_size_id);
             gl::BufferData(
                 gl::UNIFORM_BUFFER,
                 size_of::<Vec2>() as isize,
                 &vec as *const Vec2 as *const _,
                 gl::DYNAMIC_DRAW,
             );
-            gl::BindBufferBase(gl::UNIFORM_BUFFER, 1, self.view_uniform_id_2);
+            gl::BindBufferBase(gl::UNIFORM_BUFFER, 1, self.client_size_id);
+        }
+    }
+
+    pub fn set_style(&self, style_number: u32) {
+        let style_ptr = (&style_number) as *const u32;
+        unsafe {
+            gl::BindBuffer(gl::UNIFORM_BUFFER, self.style_id);
+            gl::BufferData(
+                gl::UNIFORM_BUFFER,
+                size_of::<u32>() as isize,
+                style_ptr.cast(),
+                gl::DYNAMIC_DRAW,
+            );
+            gl::BindBufferBase(gl::UNIFORM_BUFFER, 2, self.style_id);
         }
     }
 

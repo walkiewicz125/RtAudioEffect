@@ -12,6 +12,10 @@ layout(std140, binding = 1) uniform ClientSize
 {
   vec2 client_size;
 };
+layout(std140, binding = 2) uniform ShaderStyle
+{
+  uint shader_style;
+};
 
 layout(std430, binding = 0) buffer bar_values_buffer
 {
@@ -80,7 +84,13 @@ void main()
 	int vertex_index = gl_VertexID % 6;
 
 	vec2 vertex_pos = calculate_vertex_for_bar(bar_index, vertex_index);
-    frag_color = bar_colors[vertex_index];
-
+    if (shader_style == 0)
+    {
+        frag_color = bar_colors[vertex_index];
+    }
+    else
+    {
+        frag_color = bar_colors[(vertex_index+1) % 6];
+    }
 	gl_Position = projection * vec4(vertex_pos, 0.0, 1.0);
 }
