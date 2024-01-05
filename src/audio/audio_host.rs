@@ -119,6 +119,21 @@ impl AudioHost {
     fn peek_spectrum(&self) -> Vec<f32> {
         self.analyzer.lock().get_spectrum()
     }
+
+    fn set_averaging_constant(&mut self, averaging_constant: f32) {
+        self.analyzer
+            .lock()
+            .set_averaging_constant(averaging_constant);
+    }
+
+    fn get_averaging_constant(&self) -> f32 {
+        self.analyzer.lock().get_averaging_constant()
+    }
+
+    fn set_spectrum_width(&mut self, fft_length: usize) {
+        self.spectrum_width = fft_length;
+        self.analyzer.lock().set_spectrum_width(fft_length);
+    }
 }
 
 pub struct AudioAnalyzysSource {
@@ -162,5 +177,18 @@ impl AudioAnalyzysSource {
     }
     pub fn get_last_left_channel_spectrum(&mut self) -> Vec<f32> {
         self.host.peek_spectrum()
+    }
+
+    pub fn set_averaging_constant(&mut self, averaging_constant: f32) {
+        self.host.set_averaging_constant(averaging_constant);
+    }
+
+    pub fn get_averaging_constant(&self) -> f32 {
+        self.host.get_averaging_constant()
+    }
+
+    pub fn set_fft_length(&mut self, fft_length: u32) {
+        self.spectrum_width = fft_length as usize;
+        self.host.set_spectrum_width(fft_length as usize);
     }
 }

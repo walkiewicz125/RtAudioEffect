@@ -2,6 +2,7 @@ mod glfw_egui;
 mod plot;
 
 mod app;
+pub mod ui_helpers;
 use app::RtAudioEffect;
 mod audio;
 

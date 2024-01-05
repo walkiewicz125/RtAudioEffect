@@ -11,6 +11,7 @@ pub struct StreamAnalyzer {
     window_weight: f32,
     work_buffer: Vec<Complex<f32>>,
     mean_spectrum: Vec<f32>,
+    averaging_constant: f32,
 }
 
 impl StreamAnalyzer {
@@ -26,6 +27,7 @@ impl StreamAnalyzer {
             window_weight,
             work_buffer: vec![Complex { re: 0.0, im: 0.0 }; spectrum_width],
             mean_spectrum: vec![0.0; spectrum_width / 2],
+            averaging_constant: 1.0,
         }
     }
     pub fn analyze(&mut self, audio_buffer: &mut AudioBuffer) {
@@ -45,10 +47,10 @@ impl StreamAnalyzer {
 
         let spectrum = self.get_spectrum();
         for i in 0..(self.spectrum_width / 2) {
-            self.mean_spectrum[i] = self.mean_spectrum[i] * 0.9 + spectrum[i] * 0.1;
+            self.mean_spectrum[i] = self.mean_spectrum[i] * self.averaging_constant
+                + spectrum[i] * (1.0 - self.averaging_constant);
         }
     }
-
     pub fn get_spectrum(&self) -> Vec<f32> {
         self.work_buffer
             .iter()
@@ -58,6 +60,20 @@ impl StreamAnalyzer {
     }
     pub fn get_mean_spectrum(&self) -> Vec<f32> {
         self.mean_spectrum.clone()
+    }
+    pub fn set_averaging_constant(&mut self, averaging_constant: f32) {
+        self.averaging_constant = averaging_constant;
+    }
+    pub fn get_averaging_constant(&self) -> f32 {
+        self.averaging_constant
+    }
+    pub fn set_spectrum_width(&mut self, fft_width: usize) {
+        self.spectrum_width = fft_width;
+        self.fft = FftPlanner::<f32>::new().plan_fft_forward(fft_width);
+        self.window = StreamAnalyzer::generate_hanning_window(fft_width);
+        self.window_weight = self.window.iter().sum();
+        self.work_buffer = vec![Complex { re: 0.0, im: 0.0 }; fft_width];
+        self.mean_spectrum = vec![0.0; fft_width / 2];
     }
 }
 

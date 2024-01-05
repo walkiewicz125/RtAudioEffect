@@ -2,12 +2,12 @@ use std::{sync::mpsc::Receiver, time::Instant};
 
 use egui::{panel::Side, vec2, FontId, Id, Pos2, Rect, TextStyle};
 use glfw::{Context, Glfw, WindowEvent};
-use rustfft::{num_complex::Complex, FftPlanner};
 
 use crate::{
     audio::AudioAnalyzysSource,
     glfw_egui::{egui_glfw, glfw_painter},
     plot::BarSpectrumRenderer,
+    ui_helpers::ui_helpers::{text_input_f32, text_input_u32},
 };
 
 pub struct RtAudioEffect {
@@ -19,6 +19,9 @@ pub struct RtAudioEffect {
     egui_input_state: egui_glfw::EguiInputState,
     bar_spectrum_renderer: BarSpectrumRenderer,
     start_time: Instant,
+    averaging_constant_value: String,
+    fft_length_value: String,
+    audio_analyzer: AudioAnalyzysSource,
 }
 
 impl RtAudioEffect {
@@ -39,6 +42,10 @@ impl RtAudioEffect {
 
         RtAudioEffect::apply_ui_style(&egui_context);
 
+        let size = 48000 / 10;
+        let audio_analyzer = AudioAnalyzysSource::new_default_loopback(size as usize)
+            .expect("Failed to create default loopback stream");
+
         RtAudioEffect {
             glfw_context,
             window,
@@ -48,17 +55,14 @@ impl RtAudioEffect {
             egui_input_state,
             bar_spectrum_renderer,
             start_time: Instant::now(),
+            averaging_constant_value: String::from("0.9"),
+            fft_length_value: String::from("1024"),
+            audio_analyzer,
         }
     }
 
     pub fn run(&mut self) {
-        let size = 48000 / 10;
-
-        let mut audio = AudioAnalyzysSource::new_default_loopback(size as usize)
-            .expect("Failed to create default loopback stream");
-        audio.start();
-
-        let mut windowed_data: Vec<Complex<f32>> = vec![Complex { re: 0.0, im: 0.0 }; size];
+        self.audio_analyzer.start();
 
         while !self.window.should_close() {
             unsafe {
@@ -66,12 +70,12 @@ impl RtAudioEffect {
                 gl::Clear(gl::COLOR_BUFFER_BIT);
             }
 
-            let magnitude: Vec<f32> = audio.get_last_left_channel_mean_spectrum();
+            let magnitude: Vec<f32> = self.audio_analyzer.get_last_left_channel_mean_spectrum();
             self.bar_spectrum_renderer.set_spectrum(&magnitude);
             self.bar_spectrum_renderer.set_style(1);
             self.bar_spectrum_renderer.render();
 
-            let magnitude: Vec<f32> = audio.get_last_left_channel_spectrum();
+            let magnitude: Vec<f32> = self.audio_analyzer.get_last_left_channel_spectrum();
             self.bar_spectrum_renderer.set_spectrum(&magnitude);
             self.bar_spectrum_renderer.set_style(0);
             self.bar_spectrum_renderer.render();
@@ -165,8 +169,31 @@ impl RtAudioEffect {
         self.egui_context
             .begin_frame(self.egui_input_state.input.take());
 
-        egui::SidePanel::new(Side::Right, Id::new("panel"))
-            .show(&self.egui_context, |ui| ui.label("Test"));
+        egui::Window::new("Averaging Constant").show(&self.egui_context, |ui: &mut egui::Ui| {
+            ui.horizontal(|ui| {
+                let name_label = ui.label("Averaging Constant:");
+
+                if let Some(constant) =
+                    text_input_f32(ui, &name_label.id, &mut self.averaging_constant_value)
+                {
+                    self.audio_analyzer.set_averaging_constant(constant);
+                };
+            });
+            ui.horizontal(|ui| {
+                let name_label = ui.label("FFT length:");
+
+                if let Some(fft_length) =
+                    text_input_u32(ui, &name_label.id, &mut self.fft_length_value)
+                {
+                    self.audio_analyzer.set_fft_length(fft_length);
+                };
+            });
+        });
+
+        egui::SidePanel::new(Side::Right, Id::new("panel")).show(&self.egui_context, |ui| {
+            ui.label("Test");
+        });
+
         egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
             ui.menu_button("File", |ui| {
                 {

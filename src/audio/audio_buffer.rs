@@ -53,14 +53,24 @@ impl AudioBuffer {
             return vec![];
         }
 
-        let start_index =
-            self.buffer_duration_in_samples - self.new_sample_count as usize - overlap_count;
-        let end_index = start_index + sample_count;
+        if let Some(v) = self
+            .buffer_duration_in_samples
+            .checked_sub(self.new_sample_count as usize)
+        {
+            if let Some(v2) = v.checked_sub(overlap_count) {
+                let end_index = v2 + sample_count;
+                let data = self.buffers[channel as usize][v2..end_index].to_vec();
+                self.new_sample_count -= (sample_count - overlap_count) as u32;
+                return data;
+            } else {
+                let end_index = v + sample_count;
+                let data = self.buffers[channel as usize][v..end_index].to_vec();
+                self.new_sample_count -= (sample_count - overlap_count) as u32;
+                return data;
+            }
+        }
 
-        let data = self.buffers[channel as usize][start_index..end_index].to_vec();
-
-        self.new_sample_count -= (sample_count - overlap_count) as u32;
-        data
+        return vec![];
     }
 }
 
