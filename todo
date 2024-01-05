@@ -15,9 +15,10 @@
 - [x] 10. Render present spectrum over mean spectrum.
 - [x] 11. Add variable FFT length changing.
 - [x] 12. Refactor. Extract spectrum related option to higher layer. Add to ui.
-- [x] 1x. Clean up code/refactor
+- [x] 13. Clean up code/refactor
 
 
+- [ ] <b>BUG: fix shader to render apropriate number of bars when changing length</b>
 
 # 2. Render wave plot
 #### milestone 4
