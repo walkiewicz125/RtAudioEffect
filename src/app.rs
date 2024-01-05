@@ -1,14 +1,14 @@
+use glfw::{Context, Glfw, WindowEvent};
 use std::{sync::mpsc::Receiver, time::Instant};
 
-use egui::{panel::Side, vec2, FontId, Id, Pos2, Rect, TextStyle};
-use glfw::{Context, Glfw, WindowEvent};
-
 use crate::{
-    audio::AudioAnalyzysSource,
+    audio::AudioAnalyzer,
     glfw_egui::{egui_glfw, glfw_painter},
     plot::BarSpectrumRenderer,
-    ui_helpers::ui_helpers::{text_input_f32, text_input_u32},
 };
+
+mod helpers;
+mod user_interface;
 
 pub struct RtAudioEffect {
     glfw_context: Glfw,
@@ -21,7 +21,7 @@ pub struct RtAudioEffect {
     start_time: Instant,
     averaging_constant_value: String,
     fft_length_value: String,
-    audio_analyzer: AudioAnalyzysSource,
+    audio_analyzer: AudioAnalyzer,
 }
 
 impl RtAudioEffect {
@@ -43,7 +43,7 @@ impl RtAudioEffect {
         RtAudioEffect::apply_ui_style(&egui_context);
 
         let size = 48000 / 10;
-        let audio_analyzer = AudioAnalyzysSource::new_default_loopback(size as usize)
+        let audio_analyzer = AudioAnalyzer::new_default_loopback(size as usize)
             .expect("Failed to create default loopback stream");
 
         RtAudioEffect {
@@ -55,8 +55,8 @@ impl RtAudioEffect {
             egui_input_state,
             bar_spectrum_renderer,
             start_time: Instant::now(),
-            averaging_constant_value: String::from("0.9"),
-            fft_length_value: String::from("1024"),
+            averaging_constant_value: audio_analyzer.get_averaging_constant().to_string(),
+            fft_length_value: audio_analyzer.get_fft_length().to_string(),
             audio_analyzer,
         }
     }
@@ -84,166 +84,6 @@ impl RtAudioEffect {
 
             self.window.swap_buffers();
             self.glfw_context.poll_events();
-        }
-    }
-
-    fn create_glfx_context() -> Glfw {
-        let mut glfw_context = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
-
-        glfw_context.window_hint(glfw::WindowHint::ContextVersion(4, 3));
-        glfw_context.window_hint(glfw::WindowHint::OpenGlProfile(
-            glfw::OpenGlProfileHint::Core,
-        ));
-        glfw_context.window_hint(glfw::WindowHint::DoubleBuffer(true));
-        glfw_context.window_hint(glfw::WindowHint::Resizable(true));
-        glfw_context.window_hint(glfw::WindowHint::Samples(Some(8)));
-
-        glfw_context
-    }
-
-    fn create_window(
-        glfw_context: &mut Glfw,
-        resolution: (u32, u32),
-    ) -> (glfw::Window, Receiver<(f64, WindowEvent)>) {
-        let (mut window, event_receiver) = glfw_context
-            .create_window(
-                resolution.0,
-                resolution.1,
-                "Egui in GLFW!",
-                glfw::WindowMode::Windowed,
-            )
-            .expect("Failed to create GLFW window");
-
-        window.set_char_polling(true);
-        window.set_cursor_pos_polling(true);
-        window.set_key_polling(true);
-        window.set_mouse_button_polling(true);
-        window.set_size_polling(true);
-        window.make_current();
-
-        gl::load_with(|s| window.get_proc_address(s));
-        unsafe { gl::Enable(gl::MULTISAMPLE) };
-
-        (window, event_receiver)
-    }
-
-    fn initialize_egui(
-        window: &mut glfw::Window,
-    ) -> (
-        glfw_painter::Painter,
-        egui::Context,
-        egui_glfw::EguiInputState,
-    ) {
-        let painter = glfw_painter::Painter::new(window);
-        let egui_ctx = egui::Context::default();
-
-        let (width, height) = window.get_framebuffer_size();
-        let native_pixels_per_point = window.get_content_scale().0;
-
-        let egui_input_state = egui_glfw::EguiInputState::new(egui::RawInput {
-            screen_rect: Some(Rect::from_min_size(
-                Pos2::new(0f32, 0f32),
-                vec2(width as f32, height as f32) / native_pixels_per_point,
-            )),
-            ..Default::default() // todo: add pixels_per_point
-        });
-
-        (painter, egui_ctx, egui_input_state)
-    }
-
-    fn apply_ui_style(egui_context: &egui::Context) {
-        egui_context.style_mut(|x| {
-            x.text_styles.insert(
-                TextStyle::Body,
-                FontId::new(20.0, egui::FontFamily::Proportional),
-            );
-            x.text_styles.insert(
-                TextStyle::Button,
-                FontId::new(20.0, egui::FontFamily::Proportional),
-            );
-        });
-    }
-
-    fn update_ui(&mut self) {
-        self.egui_input_state.input.time = Some(self.start_time.elapsed().as_secs_f64());
-        self.egui_context
-            .begin_frame(self.egui_input_state.input.take());
-
-        egui::Window::new("Averaging Constant").show(&self.egui_context, |ui: &mut egui::Ui| {
-            ui.horizontal(|ui| {
-                let name_label = ui.label("Averaging Constant:");
-
-                if let Some(constant) =
-                    text_input_f32(ui, &name_label.id, &mut self.averaging_constant_value)
-                {
-                    self.audio_analyzer.set_averaging_constant(constant);
-                };
-            });
-            ui.horizontal(|ui| {
-                let name_label = ui.label("FFT length:");
-
-                if let Some(fft_length) =
-                    text_input_u32(ui, &name_label.id, &mut self.fft_length_value)
-                {
-                    self.audio_analyzer.set_fft_length(fft_length);
-                };
-            });
-        });
-
-        egui::SidePanel::new(Side::Right, Id::new("panel")).show(&self.egui_context, |ui| {
-            ui.label("Test");
-        });
-
-        egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
-            ui.menu_button("File", |ui| {
-                {
-                    let _ = ui.button("test 1");
-                }
-                ui.separator();
-                {
-                    let _ = ui.button("test 2");
-                }
-            });
-        });
-        let native_pixels_per_point = self.window.get_content_scale().0;
-        self.egui_context
-            .set_pixels_per_point(native_pixels_per_point);
-        let egui::FullOutput {
-            platform_output,
-            textures_delta,
-            shapes,
-            pixels_per_point: native_pixels_per_point,
-            viewport_output: _,
-        } = self.egui_context.end_frame();
-
-        //Handle cut, copy text from egui
-        if !platform_output.copied_text.is_empty() {
-            egui_glfw::copy_to_clipboard(&mut self.egui_input_state, platform_output.copied_text);
-        }
-
-        //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
-        //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
-        //drawing calls with it.
-        //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
-
-        let clipped_shapes = self
-            .egui_context
-            .tessellate(shapes, native_pixels_per_point);
-        self.painter
-            .paint_and_update_textures(1.0, &clipped_shapes, &textures_delta);
-
-        for (_, event) in glfw::flush_messages(&self.events) {
-            match event {
-                glfw::WindowEvent::Close => self.window.set_should_close(true),
-                glfw::WindowEvent::Size(width, height) => {
-                    self.painter.set_size(width as _, height as _);
-                    egui_glfw::handle_event(event, &mut self.egui_input_state);
-                }
-                _ => {
-                    println!("{:?}", event);
-                    egui_glfw::handle_event(event, &mut self.egui_input_state);
-                }
-            }
         }
     }
 }

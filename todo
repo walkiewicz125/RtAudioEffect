@@ -1,7 +1,4 @@
 # 1. Render bars of spectrum.
-
-STEPS:
-------
 #### milestone 1
 - [x] 0. Rename Waveplot to BarPlot.
 - [x] 1. generate test bars. For example: 1024 bars.
@@ -16,12 +13,16 @@ STEPS:
 - [x] 8. Create stream analyzer. With overlap option.
 - [x] 9. Little refactor of code. FFT calculation present on AudioCapture side.
 - [x] 10. Render present spectrum over mean spectrum.
-- [ ] 11. Refactor. Extract spectrum related option to higher layer. Add to ui.
-- [ ] 12. Clean up code/refactor
+- [x] 11. Add variable FFT length changing.
+- [x] 12. Refactor. Extract spectrum related option to higher layer. Add to ui.
+- [x] 1x. Clean up code/refactor
 
 
-===================================================================
 
 # 2. Render wave plot
-TODO: Render linestrip - create appropriate shader.
----------------------------------------------------
+#### milestone 4
+- [ ] 1. Make first shader
+- [ ] 2. Make code similar to bar for drawing.
+- [ ] 3. Improve current shader. Render test lines.
+- [ ] 4. Clean up code and refactor to make it more usable.
+#### milestone 5

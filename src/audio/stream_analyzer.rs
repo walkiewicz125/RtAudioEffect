@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
-use super::audio_buffer::AudioBuffer;
+use super::AudioBuffer;
 
 pub struct StreamAnalyzer {
     spectrum_width: usize,
