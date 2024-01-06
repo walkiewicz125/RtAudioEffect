@@ -9,7 +9,10 @@ use crate::{
 
 mod helpers;
 mod user_interface;
-
+struct UiContext {
+    averaging_constant_value: String,
+    fft_length_value: String,
+}
 pub struct RtAudioEffect {
     glfw_context: Glfw,
     window: glfw::Window,
@@ -19,8 +22,7 @@ pub struct RtAudioEffect {
     egui_input_state: egui_glfw::EguiInputState,
     bar_spectrum_renderer: BarSpectrumRenderer,
     start_time: Instant,
-    averaging_constant_value: String,
-    fft_length_value: String,
+    ui_context: UiContext,
     audio_analyzer: AudioAnalyzer,
 }
 
@@ -55,8 +57,10 @@ impl RtAudioEffect {
             egui_input_state,
             bar_spectrum_renderer,
             start_time: Instant::now(),
-            averaging_constant_value: audio_analyzer.get_averaging_constant().to_string(),
-            fft_length_value: audio_analyzer.get_fft_length().to_string(),
+            ui_context: UiContext {
+                averaging_constant_value: audio_analyzer.get_averaging_constant().to_string(),
+                fft_length_value: audio_analyzer.get_fft_length().to_string(),
+            },
             audio_analyzer,
         }
     }

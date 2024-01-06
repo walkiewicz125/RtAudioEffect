@@ -1,9 +1,10 @@
-use super::RtAudioEffect;
+use super::{RtAudioEffect, UiContext};
 use crate::{
+    audio::AudioAnalyzer,
     glfw_egui::{egui_glfw, glfw_painter},
     ui_helpers::ui_helpers::number_input,
 };
-use egui::{self, FontId, Pos2, Rect, TextStyle, Vec2};
+use egui::{self, CollapsingHeader, FontId, Pos2, Rect, TextStyle, Vec2};
 use glfw;
 
 impl RtAudioEffect {
@@ -44,6 +45,10 @@ impl RtAudioEffect {
                 TextStyle::Button,
                 FontId::new(20.0, egui::FontFamily::Proportional),
             );
+            x.text_styles.insert(
+                TextStyle::Heading,
+                FontId::new(20.0, egui::FontFamily::Proportional),
+            );
         });
     }
 
@@ -53,22 +58,17 @@ impl RtAudioEffect {
             .begin_frame(self.egui_input_state.input.take());
 
         egui::Window::new("Analyzer parameters").show(&self.egui_context, |ui: &mut egui::Ui| {
-            ui.horizontal(|ui| {
-                if let Some(constant) = number_input::<f32>(
-                    ui,
-                    "Averaging Constant:",
-                    &mut self.averaging_constant_value,
-                ) {
-                    self.audio_analyzer.set_averaging_constant(constant);
-                };
-            });
-            ui.horizontal(|ui| {
-                if let Some(fft_length) =
-                    number_input::<u32>(ui, "FFT length:", &mut self.fft_length_value)
-                {
-                    self.audio_analyzer.set_fft_length(fft_length);
-                };
-            });
+            RtAudioEffect::show_stream_parameters(&self.audio_analyzer, ui);
+            ui.separator();
+
+            RtAudioEffect::show_fft_parameters(&self.audio_analyzer, ui);
+            ui.separator();
+
+            RtAudioEffect::show_parameter_editor(
+                &mut self.ui_context,
+                &mut self.audio_analyzer,
+                ui,
+            );
         });
 
         egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
@@ -82,6 +82,7 @@ impl RtAudioEffect {
                 }
             });
         });
+
         let native_pixels_per_point = self.window.get_content_scale().0;
         self.egui_context
             .set_pixels_per_point(native_pixels_per_point);
@@ -101,7 +102,6 @@ impl RtAudioEffect {
         //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
         //Use this only if egui is being used for all drawing and you aren't mixing your own Open GL
         //drawing calls with it.
-        //Since we are custom drawing an OpenGL Triangle we don't need egui to clear the background.
 
         let clipped_shapes = self
             .egui_context
@@ -122,5 +122,59 @@ impl RtAudioEffect {
                 }
             }
         }
+    }
+
+    fn show_stream_parameters(audio_analyzer: &AudioAnalyzer, ui: &mut egui::Ui) {
+        CollapsingHeader::new("Stream parameters")
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Samples rate:");
+                    ui.label(audio_analyzer.host.sample_rate.to_string());
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Number of channels:");
+                    ui.label(audio_analyzer.host.channels.to_string());
+                })
+            });
+    }
+
+    fn show_fft_parameters(audio_analyzer: &AudioAnalyzer, ui: &mut egui::Ui) {
+        CollapsingHeader::new("FFT parameters")
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Spectrum width:");
+                    ui.label(audio_analyzer.host.spectrum_width.to_string());
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Averaging constant:");
+                    ui.label(audio_analyzer.host.get_averaging_constant().to_string());
+                })
+            });
+    }
+
+    fn show_parameter_editor(
+        ui_context: &mut UiContext,
+        audio_analyzer: &mut AudioAnalyzer,
+        ui: &mut egui::Ui,
+    ) {
+        ui.horizontal(|ui| ui.centered_and_justified(|ui| ui.label("Parameter editor")));
+        ui.horizontal(|ui| {
+            if let Some(constant) = number_input::<f32>(
+                ui,
+                "Averaging Constant:",
+                &mut ui_context.averaging_constant_value,
+            ) {
+                audio_analyzer.set_averaging_constant(constant);
+            };
+        });
+        ui.horizontal(|ui| {
+            if let Some(fft_length) =
+                number_input::<u32>(ui, "FFT length:", &mut ui_context.fft_length_value)
+            {
+                audio_analyzer.set_fft_length(fft_length);
+            };
+        });
     }
 }

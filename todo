@@ -18,10 +18,10 @@
 - [x] 13. Clean up code/refactor
 
 
-- [ ] <b>BUG: fix shader to render apropriate number of bars when changing length</b>
+- [x] <b>BUG: fix shader to render apropriate number of bars when changing length</b>
 
-# 2. Render wave plot
 #### milestone 4
+# 2. Render wave plot
 - [ ] 1. Make first shader
 - [ ] 2. Make code similar to bar for drawing.
 - [ ] 3. Improve current shader. Render test lines.

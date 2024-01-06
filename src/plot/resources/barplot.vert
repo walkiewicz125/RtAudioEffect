@@ -56,7 +56,7 @@ const vec3 bar_colors[6] = vec3[6](
 
 float log_of_bar(int bar_id)
 {
-    return log(max(1.0, float(bar_id)))/log(2048);
+    return log(max(1.0, float(bar_id)))/log(bar_count);
 }
 
 float bar_width(int bar_id)
@@ -67,15 +67,13 @@ float bar_width(int bar_id)
 
 vec2 calculate_vertex_for_bar(int bar_id, int vertex_id)
 {
-    float bar_offset_x = log_of_bar(bar_id) * (client_size.x);//(client_size.x / bar_count);
-    bar_offset_x = bar_offset_x * 24 / 20;
-    vec2 vertex = vec2(bar_vertices[vertex_id].x * bar_width(bar_id) * 24 / 20, bar_vertices[vertex_id].y);
-    float db = (20 / log(10)) * log(bar_values[bar_id]);
-    // 0 max, -100db min
-    db = (120+db)/100.0;
-    vertex.y *=  (client_size.y) * db;
-    // vertex.y *=  client_size.y;
-    return vertex + vec2(bar_offset_x, 0);
+    float x_offset = log_of_bar(bar_id) * (client_size.x);
+    float vertex_x = x_offset + bar_vertices[vertex_id].x * bar_width(bar_id);
+
+    float db_value = (20 / log(10)) * log(bar_values[bar_id]); // result -> db = [-inf; 0];
+    float vertex_y = bar_vertices[vertex_id].y * client_size.y * (1.0 + db_value/100.0); // result -> db = [-db/100.0; 1.0]; -> basically from 0 to -100db
+
+    return vec2(vertex_x, vertex_y);
 }
 
 void main()
