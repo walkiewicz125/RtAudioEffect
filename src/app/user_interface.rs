@@ -1,4 +1,4 @@
-use super::{RtAudioEffect, UiContext};
+use super::{RtAudioEffect, UiController};
 use crate::{
     audio::AudioAnalyzer,
     glfw_egui::{egui_glfw, glfw_painter},
@@ -53,25 +53,29 @@ impl RtAudioEffect {
     }
 
     pub fn update_ui(&mut self) {
-        self.egui_input_state.input.time = Some(self.start_time.elapsed().as_secs_f64());
-        self.egui_context
-            .begin_frame(self.egui_input_state.input.take());
+        self.context.egui_input_state.input.time = Some(self.start_time.elapsed().as_secs_f64());
+        self.context
+            .egui_context
+            .begin_frame(self.context.egui_input_state.input.take());
 
-        egui::Window::new("Analyzer parameters").show(&self.egui_context, |ui: &mut egui::Ui| {
-            RtAudioEffect::show_stream_parameters(&self.audio_analyzer, ui);
-            ui.separator();
+        egui::Window::new("Analyzer parameters").show(
+            &self.context.egui_context,
+            |ui: &mut egui::Ui| {
+                RtAudioEffect::show_stream_parameters(&self.audio_analyzer, ui);
+                ui.separator();
 
-            RtAudioEffect::show_fft_parameters(&self.audio_analyzer, ui);
-            ui.separator();
+                RtAudioEffect::show_fft_parameters(&self.audio_analyzer, ui);
+                ui.separator();
 
-            RtAudioEffect::show_parameter_editor(
-                &mut self.ui_context,
-                &mut self.audio_analyzer,
-                ui,
-            );
-        });
+                RtAudioEffect::show_parameter_editor(
+                    &mut self.ui_controller,
+                    &mut self.audio_analyzer,
+                    ui,
+                );
+            },
+        );
 
-        egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
+        egui::TopBottomPanel::top("Top").show(&self.context.egui_context, |ui| {
             ui.menu_button("File", |ui| {
                 {
                     let _ = ui.button("test 1");
@@ -83,8 +87,9 @@ impl RtAudioEffect {
             });
         });
 
-        let native_pixels_per_point = self.window.get_content_scale().0;
-        self.egui_context
+        let native_pixels_per_point = self.context.window.get_content_scale().0;
+        self.context
+            .egui_context
             .set_pixels_per_point(native_pixels_per_point);
         let egui::FullOutput {
             platform_output,
@@ -92,11 +97,14 @@ impl RtAudioEffect {
             shapes,
             pixels_per_point: native_pixels_per_point,
             viewport_output: _,
-        } = self.egui_context.end_frame();
+        } = self.context.egui_context.end_frame();
 
         //Handle cut, copy text from egui
         if !platform_output.copied_text.is_empty() {
-            egui_glfw::copy_to_clipboard(&mut self.egui_input_state, platform_output.copied_text);
+            egui_glfw::copy_to_clipboard(
+                &mut self.context.egui_input_state,
+                platform_output.copied_text,
+            );
         }
 
         //Note: passing a bg_color to paint_jobs will clear any previously drawn stuff.
@@ -104,21 +112,23 @@ impl RtAudioEffect {
         //drawing calls with it.
 
         let clipped_shapes = self
+            .context
             .egui_context
             .tessellate(shapes, native_pixels_per_point);
-        self.painter
+        self.context
+            .painter
             .paint_and_update_textures(1.0, &clipped_shapes, &textures_delta);
 
-        for (_, event) in glfw::flush_messages(&self.events) {
+        for (_, event) in glfw::flush_messages(&self.context.events) {
             match event {
-                glfw::WindowEvent::Close => self.window.set_should_close(true),
+                glfw::WindowEvent::Close => self.context.window.set_should_close(true),
                 glfw::WindowEvent::Size(width, height) => {
-                    self.painter.set_size(width as _, height as _);
-                    egui_glfw::handle_event(event, &mut self.egui_input_state);
+                    self.context.painter.set_size(width as _, height as _);
+                    egui_glfw::handle_event(event, &mut self.context.egui_input_state);
                 }
                 _ => {
                     println!("{:?}", event);
-                    egui_glfw::handle_event(event, &mut self.egui_input_state);
+                    egui_glfw::handle_event(event, &mut self.context.egui_input_state);
                 }
             }
         }
@@ -155,7 +165,7 @@ impl RtAudioEffect {
     }
 
     fn show_parameter_editor(
-        ui_context: &mut UiContext,
+        ui_context: &mut UiController,
         audio_analyzer: &mut AudioAnalyzer,
         ui: &mut egui::Ui,
     ) {

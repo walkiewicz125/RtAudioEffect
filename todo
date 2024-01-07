@@ -22,8 +22,8 @@
 
 #### milestone 4
 # 2. Render wave plot
-- [ ] 1. Make first shader
-- [ ] 2. Make code similar to bar for drawing.
-- [ ] 3. Improve current shader. Render test lines.
+- [x] 1. Make first shader
+- [x] 2. Make code similar to bar for drawing.
+- [x] 3. Improve current shader. Render test lines.
 - [ ] 4. Clean up code and refactor to make it more usable.
 #### milestone 5

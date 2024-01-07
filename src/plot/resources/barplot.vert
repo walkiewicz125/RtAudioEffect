@@ -2,7 +2,6 @@
 
 out vec3 frag_color;
 
-
 layout(std140, binding = 0) uniform Projection
 {
   mat4 projection;
@@ -12,6 +11,7 @@ layout(std140, binding = 1) uniform ClientSize
 {
   vec2 client_size;
 };
+
 layout(std140, binding = 2) uniform ShaderStyle
 {
   uint shader_style;

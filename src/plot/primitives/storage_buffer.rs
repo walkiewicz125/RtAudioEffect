@@ -36,7 +36,7 @@ impl StorageBuffer {
             gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, self.storage_buffer_id);
 
             // Allocate buffer
-            let len_size = size_of::<u32>() as isize;
+            let len_size = size_of::<T>() as isize;
             let array_size = (data.len() * size_of::<T>()) as isize;
             let total_size = len_size + array_size;
             gl::BufferData(
