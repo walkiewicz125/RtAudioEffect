@@ -64,11 +64,11 @@ impl RtAudioEffect {
         let mut lines_renderer = LinesRenderer::new().with_view(resolution);
         let mut lines_points = vec![];
         lines_points.push(Vec2 { x: 0.0, y: 0.0 });
-        lines_points.push(Vec2 { x: 0.5, y: 0.5 });
-        lines_points.push(Vec2 { x: 0.5, y: 0.9 });
-        lines_points.push(Vec2 { x: 0.0, y: 0.9 });
+        lines_points.push(Vec2 { x: 500.0, y: 500.0 });
+        lines_points.push(Vec2 { x: 500., y: 900.0 });
+        lines_points.push(Vec2 { x: 0.0, y: 900.0 });
         lines_renderer.set_line_strip_open(&lines_points);
-        lines_renderer.set_line_width(0.05);
+        lines_renderer.set_line_width(50.0);
         RtAudioEffect {
             context: RtAudioEffectContext {
                 glfw_context,

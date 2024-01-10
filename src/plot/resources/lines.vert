@@ -105,5 +105,7 @@ void main() {
 
   //frag_color = points[gl_VertexID].frag_color;
   // frag_color = vec4(1.0, 1.0, 1.0, 1.0);
+  vertex_pos.x /= client_size.x;
+  vertex_pos.y /= client_size.y;
   gl_Position = vec4(vertex_pos, 0.0, 1.0);
 }
