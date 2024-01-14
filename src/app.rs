@@ -1,4 +1,4 @@
-use glam::Vec2;
+use glam::{vec4, Vec2};
 use glfw::{Context, Glfw, WindowEvent};
 use std::{sync::mpsc::Receiver, time::Instant};
 
@@ -64,11 +64,14 @@ impl RtAudioEffect {
         let mut lines_renderer = LinesRenderer::new().with_view(resolution);
         let mut lines_points = vec![];
         lines_points.push(Vec2 { x: 0.0, y: 0.0 });
-        lines_points.push(Vec2 { x: 500.0, y: 500.0 });
+        lines_points.push(Vec2 {
+            x: 500.0,
+            y: -900.0,
+        });
         lines_points.push(Vec2 { x: 500., y: 900.0 });
-        lines_points.push(Vec2 { x: 0.0, y: 900.0 });
         lines_renderer.set_line_strip_open(&lines_points);
-        lines_renderer.set_line_width(50.0);
+        lines_renderer.set_line_width(200.0);
+        lines_renderer.set_line_color(vec4(1.0, 0.2, 0.2, 1.0));
         RtAudioEffect {
             context: RtAudioEffectContext {
                 glfw_context,

@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec2};
+use glam::{Mat4, Vec2, Vec3, Vec4};
 
 use super::{lines_shader::LinesShader, primitives::storage_buffer::StorageBuffer};
 
@@ -76,7 +76,11 @@ impl LinesRenderer {
         self.shader.draw(&self.storage);
     }
 
-    pub fn set_line_width(&self, line_width: f32) {
+    pub fn set_line_width(&mut self, line_width: f32) {
         self.shader.set_line_width(line_width);
+    }
+
+    pub fn set_line_color(&mut self, line_color: Vec4) {
+        self.shader.set_line_color(line_color);
     }
 }

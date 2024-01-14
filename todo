@@ -19,11 +19,20 @@
 
 
 - [x] <b>BUG: fix shader to render apropriate number of bars when changing length</b>
-
 #### milestone 4
+
 # 2. Render wave plot
 - [x] 1. Make first shader
 - [x] 2. Make code similar to bar for drawing.
 - [x] 3. Improve current shader. Render test lines.
-- [ ] 4. Clean up code and refactor to make it more usable.
+- [x] 3.5. Fixing line renderer. Drawing lines with connector. Open/Closed lines
+- [x] 4. Clean up code and refactor to make it more usable.
 #### milestone 5
+- [ ] 1. Make view for rendering waveplot on top half of screen and spectrum on bottom half. Draw test lines there.
+- [ ] 2. Use egui for managing layout? make window with spectrum view and window with waveform view. Render to texture? of required size?
+
+# 3. Time analysis of spectrum
+# 3.1 Make filters for frequency bands.
+* Store them in a time buffer for further analysys
+# 3.2 Make horizontal view for each frequency band using lines with height as magnitude
+* Fresh data on the right. Past data on the left. Like waveplot.

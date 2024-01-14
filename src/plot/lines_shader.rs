@@ -1,5 +1,5 @@
-use glam::{Mat4, Vec2};
-use std::mem::size_of;
+use glam::{Mat4, Vec2, Vec3, Vec4};
+use std::{default, mem::size_of};
 
 use super::primitives::{shader_program::ShaderProgram, storage_buffer::StorageBuffer};
 
@@ -13,6 +13,17 @@ pub struct LinesShader {
 
     // application internal
     vertices_count: i32,
+    line_parameters: LineParametersUniform,
+}
+
+#[repr(C)]
+#[derive(Default)]
+struct LineParametersUniform {
+    line_width: f32,
+    padding1: f32,
+    padding2: f32,
+    padding3: f32,
+    line_color: Vec4,
 }
 
 impl LinesShader {
@@ -44,7 +55,8 @@ impl LinesShader {
             projection_id,
             client_size_id,
             line_width_id,
-            vertices_count: 6,
+            vertices_count: 12,
+            line_parameters: LineParametersUniform::default(),
         })
     }
 
@@ -78,13 +90,23 @@ impl LinesShader {
         }
     }
 
-    pub fn set_line_width(&self, line_width: f32) {
+    pub fn set_line_width(&mut self, line_width: f32) {
+        self.line_parameters.line_width = line_width;
+        self.buffer_uniform();
+    }
+
+    pub fn set_line_color(&mut self, line_color: Vec4) {
+        self.line_parameters.line_color = line_color;
+        self.buffer_uniform();
+    }
+
+    fn buffer_uniform(&self) {
         unsafe {
             gl::BindBuffer(gl::UNIFORM_BUFFER, self.line_width_id);
             gl::BufferData(
                 gl::UNIFORM_BUFFER,
-                size_of::<f32>() as isize,
-                &line_width as *const f32 as *const _,
+                size_of::<LineParametersUniform>() as isize,
+                &self.line_parameters as *const LineParametersUniform as *const _,
                 gl::DYNAMIC_DRAW,
             );
             gl::BindBufferBase(gl::UNIFORM_BUFFER, 3, self.line_width_id);
@@ -99,7 +121,7 @@ impl LinesShader {
             gl::DrawArrays(
                 gl::TRIANGLES,
                 0,
-                self.vertices_count * (storage_buffer.len() - 2),
+                self.vertices_count * (storage_buffer.len() - 1),
             );
         }
         self.shader_program.disable();
