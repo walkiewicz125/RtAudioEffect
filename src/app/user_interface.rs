@@ -6,7 +6,7 @@ use crate::{
 };
 use egui::{
     self, load::SizedTexture, Align, CollapsingHeader, FontId, Image, Layout, Pos2, Rect,
-    TextStyle, Vec2,
+    Separator, TextStyle, Vec2,
 };
 use glfw;
 
@@ -61,23 +61,6 @@ impl RtAudioEffect {
             .egui_context
             .begin_frame(self.context.egui_input_state.input.take());
 
-        egui::Window::new("Analyzer parameters").show(
-            &self.context.egui_context,
-            |ui: &mut egui::Ui| {
-                RtAudioEffect::show_stream_parameters(&self.audio_analyzer, ui);
-                ui.separator();
-
-                RtAudioEffect::show_fft_parameters(&self.audio_analyzer, ui);
-                ui.separator();
-
-                RtAudioEffect::show_parameter_editor(
-                    &mut self.ui_controller,
-                    &mut self.audio_analyzer,
-                    ui,
-                );
-            },
-        );
-
         egui::TopBottomPanel::top("Top").show(&self.context.egui_context, |ui| {
             ui.menu_button("File", |ui| {
                 {
@@ -92,7 +75,28 @@ impl RtAudioEffect {
 
         egui::CentralPanel::default().show(&self.context.egui_context, |ui| {
             let texture_id: egui::TextureId = self.context.painter.new_opengl_texture(1);
-            ui.with_layout(Layout::top_down(Align::Center), |ui| {
+            ui.horizontal_top(|ui| {
+                ui.allocate_ui_with_layout(
+                    Vec2 {
+                        x: 250.0,
+                        y: ui.available_height(),
+                    },
+                    Layout::top_down(Align::LEFT),
+                    |ui: &mut egui::Ui| {
+                        RtAudioEffect::show_stream_parameters(&self.audio_analyzer, ui);
+                        ui.separator();
+
+                        RtAudioEffect::show_fft_parameters(&self.audio_analyzer, ui);
+                        ui.separator();
+
+                        RtAudioEffect::show_parameter_editor(
+                            &mut self.ui_controller,
+                            &mut self.audio_analyzer,
+                            ui,
+                        );
+                    },
+                );
+                ui.add(Separator::default().vertical());
                 ui.add(Image::from_texture(SizedTexture {
                     id: texture_id,
                     size: ui.available_size(),
@@ -182,7 +186,7 @@ impl RtAudioEffect {
         audio_analyzer: &mut AudioAnalyzer,
         ui: &mut egui::Ui,
     ) {
-        ui.horizontal(|ui| ui.centered_and_justified(|ui| ui.label("Parameter editor")));
+        ui.strong("Parameter editor:");
         ui.horizontal(|ui| {
             if let Some(constant) = number_input::<f32>(
                 ui,

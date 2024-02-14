@@ -29,6 +29,9 @@
 - [x] 4. Clean up code and refactor to make it more usable.
 #### milestone 5
 - [ ] 1. Make view for rendering waveplot on top half of screen and spectrum on bottom half. Draw test lines there.
+- [x] 1.1 Render to texture
+- [x] 1.2 Update UI to render parameters editor and graph side by side
+- [ ] 1.3 Refactor
 - [ ] 2. Use egui for managing layout? make window with spectrum view and window with waveform view. Render to texture? of required size?
 
 # 3. Time analysis of spectrum

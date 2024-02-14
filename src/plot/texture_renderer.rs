@@ -26,8 +26,8 @@ impl TextureRenderTarget {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGB as i32,
-                1024,
-                768,
+                10240,
+                7680,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
@@ -62,7 +62,7 @@ impl TextureRenderTarget {
             gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer_name);
             gl::ClearColor(0.455, 0.302, 0.663, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            gl::Viewport(0, 0, 1024, 768); // Render on the whole framebuffer, complete from the lower left corner to the upper right
+            gl::Viewport(0, 0, 10240, 7680); // Render on the whole framebuffer, complete from the lower left corner to the upper right
         }
 
         spectrum_renderer.render();
