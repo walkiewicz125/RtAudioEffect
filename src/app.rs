@@ -110,6 +110,7 @@ impl RtAudioEffect {
             let magnitude: Vec<f32> = self.audio_analyzer.get_last_left_channel_spectrum();
             self.spectrum_renderer.set_spectrum(&magnitude);
             self.spectrum_renderer.set_style(0);
+            self.spectrum_renderer.flip_vertically(true);
             texture_renderer.render(&self.spectrum_renderer);
 
             self.lines_renderer.render();
