@@ -94,6 +94,16 @@ impl RtAudioEffect {
                             &mut self.audio_analyzer,
                             ui,
                         );
+                        ui.separator();
+                        ui.strong("Stream control:");
+                        ui.columns(2, |ui| {
+                            if ui[0].button("Start").clicked() {
+                                self.audio_analyzer.start();
+                            }
+                            if ui[1].button("Stop").clicked() {
+                                self.audio_analyzer.stop();
+                            }
+                        });
                     },
                 );
                 ui.add(Separator::default().vertical());
