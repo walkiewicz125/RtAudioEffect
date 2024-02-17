@@ -1,6 +1,8 @@
 use glam::Mat4;
 
-use super::{barplot_shader::BarplotShader, primitives::storage_buffer::StorageBuffer};
+use super::{
+    barplot_shader::BarplotShader, primitives::storage_buffer::StorageBuffer, renderer::Renderer,
+};
 
 pub struct BarSpectrumRenderer {
     shader: BarplotShader,
@@ -66,8 +68,10 @@ impl BarSpectrumRenderer {
     pub fn set_style(&self, style_number: u32) {
         self.shader.set_style(style_number);
     }
+}
 
-    pub fn render(&self) {
+impl Renderer for BarSpectrumRenderer {
+    fn render(&self) {
         self.shader.draw(&self.storage);
     }
 }

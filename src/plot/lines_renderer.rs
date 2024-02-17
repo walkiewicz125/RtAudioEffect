@@ -1,6 +1,8 @@
 use glam::{Mat4, Vec2, Vec3, Vec4};
 
-use super::{lines_shader::LinesShader, primitives::storage_buffer::StorageBuffer};
+use super::{
+    lines_shader::LinesShader, primitives::storage_buffer::StorageBuffer, renderer::Renderer,
+};
 
 pub struct LinesRenderer {
     shader: LinesShader,
@@ -72,15 +74,17 @@ impl LinesRenderer {
         self.storage.store_array(&points);
     }
 
-    pub fn render(&self) {
-        self.shader.draw(&self.storage);
-    }
-
     pub fn set_line_width(&mut self, line_width: f32) {
         self.shader.set_line_width(line_width);
     }
 
     pub fn set_line_color(&mut self, line_color: Vec4) {
         self.shader.set_line_color(line_color);
+    }
+}
+
+impl Renderer for LinesRenderer {
+    fn render(&self) {
+        self.shader.draw(&self.storage);
     }
 }

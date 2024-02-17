@@ -144,7 +144,7 @@ impl RtAudioEffect {
                     egui_glfw::handle_event(event, &mut self.context.egui_input_state);
                 }
                 _ => {
-                    println!("{:?}", event);
+                    // println!("{:?}", event);
                     egui_glfw::handle_event(event, &mut self.context.egui_input_state);
                 }
             }

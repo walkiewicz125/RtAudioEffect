@@ -1,4 +1,4 @@
-use super::BarSpectrumRenderer;
+use super::renderer::Renderer;
 
 pub struct TextureRenderTarget {
     frame_buffer_name: u32,
@@ -35,8 +35,8 @@ impl TextureRenderTarget {
             );
 
             // Poor filtering. Needed !
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
 
             // Set "renderedTexture" as our colour attachement #0
             gl::FramebufferTexture(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, rendered_texture, 0);
@@ -57,7 +57,7 @@ impl TextureRenderTarget {
         }
     }
 
-    pub fn render(&self, spectrum_renderer: &BarSpectrumRenderer) {
+    pub fn render(&self, renderer: &dyn Renderer) {
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer_name);
             gl::ClearColor(0.455, 0.302, 0.663, 1.0);
@@ -65,7 +65,7 @@ impl TextureRenderTarget {
             gl::Viewport(0, 0, 10240, 7680); // Render on the whole framebuffer, complete from the lower left corner to the upper right
         }
 
-        spectrum_renderer.render();
+        renderer.render();
 
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
