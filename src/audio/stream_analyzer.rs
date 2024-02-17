@@ -47,9 +47,10 @@ impl StreamAnalyzer {
 
         let spectrum = self.get_spectrum();
         for i in 0..(self.spectrum_width / 2) {
-            self.mean_spectrum[i] = self.mean_spectrum[i] * self.averaging_constant
-                + spectrum[i] * (1.0 - self.averaging_constant);
+            self.mean_spectrum[i] = self.mean_spectrum[i] * (1.0 - self.averaging_constant)
+                + spectrum[i] * self.averaging_constant;
         }
+        println!("Const: {}", self.averaging_constant);
     }
     pub fn get_spectrum(&self) -> Vec<f32> {
         self.work_buffer

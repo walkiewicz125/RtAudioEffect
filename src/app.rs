@@ -96,6 +96,9 @@ impl RtAudioEffect {
     pub fn run(&mut self) {
         self.audio_analyzer.start();
         let texture_renderer = TextureRenderTarget::new();
+        self.spectrum_renderer.set_style(0);
+        self.spectrum_renderer.flip_vertically(true);
+
         while !self.context.window.should_close() {
             unsafe {
                 gl::ClearColor(0.455, 0.302, 0.663, 1.0);
@@ -104,12 +107,6 @@ impl RtAudioEffect {
 
             let magnitude: Vec<f32> = self.audio_analyzer.get_last_left_channel_mean_spectrum();
             self.spectrum_renderer.set_spectrum(&magnitude);
-            self.spectrum_renderer.set_style(1);
-
-            let magnitude: Vec<f32> = self.audio_analyzer.get_last_left_channel_spectrum();
-            self.spectrum_renderer.set_spectrum(&magnitude);
-            self.spectrum_renderer.set_style(0);
-            self.spectrum_renderer.flip_vertically(true);
             texture_renderer.render(&self.spectrum_renderer);
 
             self.update_ui();
