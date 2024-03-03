@@ -3,10 +3,11 @@ use super::renderer::Renderer;
 pub struct TextureRenderTarget {
     frame_buffer_name: u32,
     rendered_texture: u32,
+    resolution: (u32, u32),
 }
 
 impl TextureRenderTarget {
-    pub fn new() -> Self {
+    pub fn new(resolution: (u32, u32)) -> Self {
         let mut frame_buffer_name: u32 = 0;
         let mut rendered_texture: u32 = 0;
 
@@ -26,8 +27,8 @@ impl TextureRenderTarget {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGB as i32,
-                10240,
-                7680,
+                resolution.0 as i32,
+                resolution.1 as i32,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
@@ -54,6 +55,7 @@ impl TextureRenderTarget {
         Self {
             frame_buffer_name,
             rendered_texture,
+            resolution,
         }
     }
 
@@ -62,12 +64,43 @@ impl TextureRenderTarget {
             gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer_name);
             gl::ClearColor(0.455, 0.302, 0.663, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            gl::Viewport(0, 0, 10240, 7680); // Render on the whole framebuffer, complete from the lower left corner to the upper right
+            gl::Viewport(0, 0, self.resolution.0 as i32, self.resolution.1 as i32);
+            // Render on the whole framebuffer, complete from the lower left corner to the upper right
         }
 
         renderer.render();
 
         unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+        }
+    }
+
+    pub fn get_texture_id(&self) -> u32 {
+        self.rendered_texture
+    }
+
+    pub fn set_resolution(&mut self, resolution: (u32, u32)) {
+        self.resolution = resolution;
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer_name);
+
+            // "Bind" the newly created texture : all future texture functions will modify this texture
+            gl::BindTexture(gl::TEXTURE_2D, self.rendered_texture);
+
+            // Give an empty image to OpenGL ( the last "0" )
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGB as i32,
+                resolution.0 as i32,
+                resolution.1 as i32,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                std::ptr::null(),
+            );
+
+            gl::BindTexture(gl::TEXTURE_2D, 0);
             gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
         }
     }

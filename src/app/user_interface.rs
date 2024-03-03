@@ -74,7 +74,6 @@ impl RtAudioEffect {
         });
 
         egui::CentralPanel::default().show(&self.context.egui_context, |ui| {
-            let texture_id: egui::TextureId = self.context.painter.new_opengl_texture(1);
             ui.horizontal_top(|ui| {
                 ui.allocate_ui_with_layout(
                     Vec2 {
@@ -107,8 +106,10 @@ impl RtAudioEffect {
                     },
                 );
                 ui.add(Separator::default().vertical());
+                self.renderers
+                    .set_resolution_of_spectrum(ui.available_size());
                 ui.add(Image::from_texture(SizedTexture {
-                    id: texture_id,
+                    id: self.ui_controller.spectrum_texture,
                     size: ui.available_size(),
                 }));
             })

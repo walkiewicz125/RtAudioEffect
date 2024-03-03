@@ -32,7 +32,7 @@ impl BarSpectrumRenderer {
     pub fn set_view(&mut self, client_size: (u32, u32)) {
         self.client_size = client_size;
 
-        let mut view_matrix: Mat4 = Mat4::default();
+        let view_matrix: Mat4;
         if self.flip_vertically {
             view_matrix = Mat4::orthographic_rh(
                 0.0,
