@@ -12,8 +12,6 @@ use cpal::{
 };
 use log::{error, info, trace};
 
-use crate::audio::AudioStreamReceiver;
-
 use super::{AudioBuffer, AudioDeviceParameters};
 
 pub trait AudioDataConsumer {
@@ -61,13 +59,11 @@ impl AudioDevice {
             buffer_duration_in_samples,
         )));
 
-        let (data_sender, data_receiver) = mpsc::channel();
-
-        let mut stream_receiver = AudioStreamReceiver::new(data_sender);
+        let (data_sender, data_receiver) = mpsc::channel::<Vec<f32>>();
 
         let Ok(stream) = device.build_input_stream(
             &config.into(),
-            move |data, info: &_| stream_receiver.data_callback(data.to_vec(), info),
+            move |data, info: &_| data_sender.send(data.to_vec()).unwrap(),
             move |err| error!("A error occured on stream: {err:?}"),
             None,
         ) else {
