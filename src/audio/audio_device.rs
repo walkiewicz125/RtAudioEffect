@@ -1,5 +1,8 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        mpsc::{self, Receiver},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 
@@ -19,11 +22,12 @@ pub trait AudioDataConsumer {
 
 pub struct AudioDevice {
     device: Device,
+    stream: Stream,
     parameters: AudioDeviceParameters,
     buffer_duration: Duration,
     audio_buffer: Arc<Mutex<AudioBuffer>>,
-    stream: Stream,
-    data_callback: Option<Box<dyn AudioDataConsumer>>,
+    data_receiver: Receiver<Vec<f32>>,
+    data_callback: Option<Arc<Mutex<dyn AudioDataConsumer>>>,
 }
 pub enum Overlap {
     None,
@@ -57,7 +61,9 @@ impl AudioDevice {
             buffer_duration_in_samples,
         )));
 
-        let mut stream_receiver = AudioStreamReceiver::new(audio_buffer.clone());
+        let (data_sender, data_receiver) = mpsc::channel();
+
+        let mut stream_receiver = AudioStreamReceiver::new(data_sender);
 
         let Ok(stream) = device.build_input_stream(
             &config.into(),
@@ -71,10 +77,11 @@ impl AudioDevice {
 
         Ok(AudioDevice {
             device,
+            stream,
             parameters,
             buffer_duration,
             audio_buffer,
-            stream,
+            data_receiver,
             data_callback: None,
         })
     }
@@ -95,27 +102,31 @@ impl AudioDevice {
         }
     }
 
-    pub fn get_new_samples_count(&self) -> usize {
-        self.audio_buffer.lock().unwrap().get_new_samples_count()
-    }
-
-    fn read_samples(
-        &mut self,
-        sample_count: usize,
-        overlap_size: usize,
-    ) -> Result<Vec<Vec<f32>>, String> {
-        self.audio_buffer
-            .lock()
-            .unwrap()
-            .read_samples(sample_count, overlap_size)
-    }
-
     pub fn set_callback(
-        &self,
+        &mut self,
         update_duration: Duration,
         overlap: Overlap,
-        data_consumer: Box<dyn AudioDataConsumer>,
+        data_consumer: Arc<Mutex<dyn AudioDataConsumer>>,
     ) {
-        todo!()
+        self.data_callback = Some(data_consumer);
+    }
+
+    pub fn run(&mut self) {
+        while let Ok(new_data) = self.data_receiver.recv_timeout(Duration::from_secs(0)) {
+            self.audio_buffer.lock().unwrap().store(new_data);
+
+            let new_samples = self.audio_buffer.lock().unwrap().get_new_samples_count();
+
+            let samples = self
+                .audio_buffer
+                .lock()
+                .unwrap()
+                .read_samples(new_samples, 0)
+                .unwrap();
+
+            if let Some(callback) = &self.data_callback {
+                callback.lock().unwrap().consume_samples(samples);
+            }
+        }
     }
 }

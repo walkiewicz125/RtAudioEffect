@@ -1,20 +1,18 @@
-use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 
 use cpal::InputCallbackInfo;
-use log::{debug, trace};
-
-use super::AudioBuffer;
+use log::trace;
 
 pub struct AudioStreamReceiver {
-    sample_buffer: Arc<Mutex<AudioBuffer>>,
+    data_sender: Sender<Vec<f32>>,
 }
 
 impl AudioStreamReceiver {
-    pub fn new(sample_buffer: Arc<Mutex<AudioBuffer>>) -> AudioStreamReceiver {
-        AudioStreamReceiver { sample_buffer }
+    pub fn new(data_sender: Sender<Vec<f32>>) -> AudioStreamReceiver {
+        AudioStreamReceiver { data_sender }
     }
     pub fn data_callback(&mut self, data: Vec<f32>, callback_info: &InputCallbackInfo) {
         trace!("Callback info: {callback_info:#?}");
-        self.sample_buffer.lock().unwrap().store(data);
+        self.data_sender.send(data);
     }
 }
