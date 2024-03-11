@@ -928,6 +928,7 @@ dependencies = [
  "gl",
  "glam",
  "glfw",
+ "log",
  "rustfft",
 ]
 
