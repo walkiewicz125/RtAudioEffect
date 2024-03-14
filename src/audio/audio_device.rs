@@ -12,11 +12,7 @@ use cpal::{
 };
 use log::{error, info, trace};
 
-use super::{AudioBuffer, AudioDeviceParameters};
-
-pub trait AudioDataConsumer {
-    fn consume_samples(&mut self, channels_samples: Vec<Vec<f32>>);
-}
+use super::{AudioBuffer, AudioDeviceParameters, AudioStreamConsumer};
 
 pub struct AudioDevice {
     device: Device,
@@ -25,7 +21,7 @@ pub struct AudioDevice {
     buffer_duration: Duration,
     audio_buffer: Arc<Mutex<AudioBuffer>>,
     data_receiver: Receiver<Vec<f32>>,
-    data_callback: Option<Arc<Mutex<dyn AudioDataConsumer>>>,
+    data_callback: Option<Arc<Mutex<dyn AudioStreamConsumer>>>,
 }
 pub enum Overlap {
     None,
@@ -102,27 +98,22 @@ impl AudioDevice {
         &mut self,
         update_duration: Duration,
         overlap: Overlap,
-        data_consumer: Arc<Mutex<dyn AudioDataConsumer>>,
+        data_consumer: Arc<Mutex<dyn AudioStreamConsumer>>,
     ) {
         self.data_callback = Some(data_consumer);
     }
 
     pub fn run(&mut self) {
         while let Ok(new_data) = self.data_receiver.recv_timeout(Duration::from_secs(0)) {
-            self.audio_buffer.lock().unwrap().store(new_data);
-
-            let new_samples = self.audio_buffer.lock().unwrap().get_new_samples_count();
-
-            let samples = self
-                .audio_buffer
-                .lock()
-                .unwrap()
-                .read_samples(new_samples, 0)
-                .unwrap();
+            self.audio_buffer.lock().unwrap().store(new_data.clone());
 
             if let Some(callback) = &self.data_callback {
-                callback.lock().unwrap().consume_samples(samples);
+                callback.lock().unwrap().process_new_samples(new_data)
             }
         }
+    }
+
+    pub fn get_parameters(&self) -> AudioDeviceParameters {
+        self.parameters.clone()
     }
 }

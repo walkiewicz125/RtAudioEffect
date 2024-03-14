@@ -34,23 +34,33 @@ impl AudioBuffer {
         self.new_samples_count
     }
 
-    pub fn read_samples(
+    pub fn read_new_samples(
         &mut self,
-        sample_count: usize,
-        overlap_size: usize,
+        new_samples: usize,
+        total_sample_count: usize,
     ) -> Result<Vec<Vec<f32>>, String> {
-        debug!("reading samples. sample_count: {sample_count}, overlap_size: {overlap_size}");
-        assert!(
-            overlap_size < sample_count,
-            "sample_count have to be greater than overlap_count"
+        debug!(
+            "reading samples. new_samples: {new_samples}, total_sample_count: {total_sample_count}"
         );
 
-        if self.new_samples_count < (sample_count - overlap_size) {
-            return Err(String::from("Not enough data"));
+        assert!(
+            new_samples < total_sample_count,
+            "total_sample_count have to be greater than new_samples"
+        );
+
+        assert!(
+            total_sample_count < self.buffer_duration_in_samples,
+            "total_sample_count have to be lesser than buffer_duration_in_samples"
+        );
+
+        if self.new_samples_count < new_samples {
+            return Err(String::from("Not enough new data"));
         }
 
-        let start_index = self.buffer_duration_in_samples - self.new_samples_count - overlap_size;
-        let end_index = start_index + sample_count;
+        let start_index =
+            self.buffer_duration_in_samples - self.new_samples_count - total_sample_count
+                + new_samples;
+        let end_index = start_index + total_sample_count;
 
         let mut channels_samples: Vec<Vec<f32>> = vec![];
 
@@ -59,7 +69,7 @@ impl AudioBuffer {
             channels_samples.push(samples);
         }
 
-        self.new_samples_count -= sample_count - overlap_size;
+        self.new_samples_count -= new_samples;
 
         Ok(channels_samples)
     }
