@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
-use crate::audio::{AudioBuffer, AudioDeviceParameters, AudioStreamConsumer};
+use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
 pub struct SpectrumAnalyzer {
     spectrum_width: usize,

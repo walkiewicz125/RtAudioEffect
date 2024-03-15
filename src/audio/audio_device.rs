@@ -12,12 +12,12 @@ use cpal::{
 };
 use log::{error, info, trace};
 
-use super::{AudioBuffer, AudioDeviceParameters, AudioStreamConsumer};
+use super::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
 pub struct AudioDevice {
     device: Device,
     stream: Stream,
-    parameters: AudioDeviceParameters,
+    parameters: Arc<StreamParameters>,
     buffer_duration: Duration,
     audio_buffer: Arc<Mutex<AudioBuffer>>,
     data_receiver: Receiver<Vec<f32>>,
@@ -42,16 +42,16 @@ impl AudioDevice {
             panic!("Unsupported format");
         };
 
-        let parameters = AudioDeviceParameters {
+        let parameters = Arc::new(StreamParameters {
             sample_rate,
             channels,
-        };
+        });
 
         let buffer_duration = Duration::from_secs_f32(1.0);
         let buffer_duration_in_samples: usize =
             (sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
         let audio_buffer = Arc::new(Mutex::new(AudioBuffer::new(
-            channels,
+            parameters.clone(),
             buffer_duration_in_samples,
         )));
 
@@ -113,7 +113,7 @@ impl AudioDevice {
         }
     }
 
-    pub fn get_parameters(&self) -> AudioDeviceParameters {
+    pub fn get_parameters(&self) -> Arc<StreamParameters> {
         self.parameters.clone()
     }
 }

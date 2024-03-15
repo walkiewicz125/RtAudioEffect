@@ -1,18 +1,27 @@
+use std::sync::Arc;
+
 use log::{debug, warn};
+
+use super::StreamParameters;
 
 pub struct AudioBuffer {
     channels: u16,
     buffer_duration_in_samples: usize,
-    samples: Vec<Vec<f32>>,
+    channels_buffers: Vec<Vec<f32>>,
     new_samples_count: usize,
 }
 
 impl AudioBuffer {
-    pub fn new(channels: u16, buffer_duration_in_samples: usize) -> AudioBuffer {
+    pub fn new(
+        stream_parameters: Arc<StreamParameters>,
+        buffer_duration_in_samples: usize,
+    ) -> AudioBuffer {
+        let empty_channels_buffers =
+            vec![vec![0.0; buffer_duration_in_samples]; stream_parameters.channels as usize];
         AudioBuffer {
-            channels,
+            channels: stream_parameters.channels,
             buffer_duration_in_samples,
-            samples: vec![vec![0.0; buffer_duration_in_samples]; channels as usize],
+            channels_buffers: empty_channels_buffers,
             new_samples_count: 0,
         }
     }
@@ -64,7 +73,7 @@ impl AudioBuffer {
 
         let mut channels_samples: Vec<Vec<f32>> = vec![];
 
-        for channel_samples in &self.samples {
+        for channel_samples in &self.channels_buffers {
             let samples = channel_samples[start_index..end_index].to_vec();
             channels_samples.push(samples);
         }
@@ -75,7 +84,7 @@ impl AudioBuffer {
     }
 
     fn trim_buffers(&mut self) {
-        for buffer in &mut self.samples {
+        for buffer in &mut self.channels_buffers {
             if buffer.len() > self.buffer_duration_in_samples {
                 let oversize = buffer.len() - self.buffer_duration_in_samples;
                 buffer.drain(0..oversize);
@@ -90,7 +99,7 @@ impl AudioBuffer {
     fn distribute_into_channels(&mut self, data: Vec<f32>) -> usize {
         for i in 0..data.len() {
             let channel = i % self.channels as usize;
-            self.samples[channel].push(data[i]);
+            self.channels_buffers[channel].push(data[i]);
         }
         data.len() / self.channels as usize
     }
