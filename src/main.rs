@@ -1,10 +1,12 @@
 mod glfw_egui;
 mod plot;
 
-mod app;
 mod audio_analyzer;
+mod audio_processor;
 pub mod ui_helpers;
-use app::RtAudioEffect;
+use std::time::{Duration, Instant};
+
+use audio_processor::AudioProcessor;
 mod audio;
 
 const SCREEN_WIDTH: u32 = 1920;
@@ -44,8 +46,18 @@ fn main() {
         eprintln!("log::set_logger failed: {err:#?}");
     }
 
-    let mut app_context = RtAudioEffect::new();
-    app_context.run();
+    let mut audio_processor = AudioProcessor::new();
+
+    audio_processor.start();
+
+    let start_time = Instant::now();
+
+    // for tests
+    while (Instant::now() - start_time) < Duration::from_secs_f32(3.0) {
+        audio_processor.update();
+    }
+
+    audio_processor.stop();
 
     println!("Goodbye RtAudioEffect!");
 }

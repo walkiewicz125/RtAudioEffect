@@ -1,7 +1,7 @@
 @startuml "run of processing"
 
 loop
-    RtAudioEffect -> AudioDevice : run()
+    AudioProcessor -> AudioDevice : run()
 
     loop until recv_timeout != Ok
         AudioDevice -> cpal_Stream: recv_timeout(0)
@@ -14,7 +14,7 @@ loop
 
     end
 
-    RtAudioEffect <-- AudioDevice
+    AudioProcessor <-- AudioDevice
 end
 
 @enduml

@@ -108,7 +108,7 @@ impl AudioDevice {
         self.consumers_handlers.push(handler);
     }
 
-    pub fn run(&mut self) {
+    pub fn update(&mut self) {
         while let Ok(new_data) = self.data_receiver.recv_timeout(Duration::from_secs(0)) {
             for handler in &self.consumers_handlers {
                 handler.audio_buffer.lock().unwrap().store(new_data.clone());

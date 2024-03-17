@@ -1,8 +1,8 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
-use crate::audio::{AudioBuffer, AudioStreamConsumer, OneChannelSamples, StreamParameters};
+use crate::audio::OneChannelSamples;
 
 pub type Spectrum = Vec<f32>;
 pub type ManyChannelsSpectrums = Vec<Spectrum>;

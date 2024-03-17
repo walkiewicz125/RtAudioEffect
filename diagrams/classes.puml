@@ -55,10 +55,10 @@ Spectrogram o-- AnalyzerParameters
 Spectrogram o-- StreamParameters
 
 
-class RtAudioEffect{
+class AudioProcessor{
 
 }
 
-RtAudioEffect ..> AudioManager
-RtAudioEffect *-- AudioDevice
-RtAudioEffect *-- StreamAnalyzer
+AudioProcessor ..> AudioManager
+AudioProcessor *-- AudioDevice
+AudioProcessor *-- StreamAnalyzer

@@ -5,44 +5,7 @@ use std::{
 
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
-use super::{ManyChannelsSpectrums, Spectrum, SpectrumAnalyzer};
-
-pub struct AnalyzerParameters {
-    spectrum_width: usize,
-    refresh_time_in_samples: usize,
-    number_of_spectrums_in_history: usize,
-}
-
-pub struct Spectrogram {
-    parameters: Arc<AnalyzerParameters>,
-    spectrum_history: Vec<Vec<Spectrum>>,
-}
-impl Spectrogram {
-    fn new(
-        parameters: Arc<AnalyzerParameters>,
-        stream_parameters: Arc<StreamParameters>,
-    ) -> Spectrogram {
-        let empty_spectrum = vec![0.0; parameters.spectrum_width];
-        let empty_spectogram_one_channel =
-            vec![empty_spectrum; parameters.number_of_spectrums_in_history];
-        let empty_spectogram_all_channels =
-            vec![empty_spectogram_one_channel; stream_parameters.channels as usize];
-        Spectrogram {
-            parameters,
-            spectrum_history: empty_spectogram_all_channels,
-        }
-    }
-
-    fn push_spectrums(&mut self, spectrums: ManyChannelsSpectrums) {
-        self.spectrum_history.push(spectrums);
-
-        if self.spectrum_history.len() > self.parameters.number_of_spectrums_in_history {
-            let oversize =
-                self.spectrum_history.len() - self.parameters.number_of_spectrums_in_history;
-            self.spectrum_history.drain(0..oversize);
-        }
-    }
-}
+use super::{AnalyzerParameters, Spectrogram, SpectrumAnalyzer};
 
 pub struct StreamAnalyzer {
     analyzer_parameters: Arc<AnalyzerParameters>,
