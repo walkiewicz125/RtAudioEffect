@@ -8,6 +8,7 @@ use log::info;
 use crate::{
     audio::{AudioDevice, AudioManager, AudioStreamConsumer},
     audio_analyzer::StreamAnalyzer,
+    ui_controller::AudioAnalyzysProvider,
 };
 
 pub struct AudioProcessor {
@@ -51,6 +52,8 @@ impl AudioProcessor {
         self.audio_device.stop();
     }
 }
+
+impl AudioAnalyzysProvider for AudioProcessor {}
 
 impl Default for AudioProcessor {
     fn default() -> Self {
