@@ -37,10 +37,15 @@ impl log::Log for SimpleLogger {
 static LOGGER: SimpleLogger = SimpleLogger;
 
 fn main() {
-    println!("Hello, world!");
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug));
+    println!("Hello RtAudioEffect!");
+
+    if let Err(err) = log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+    {
+        eprintln!("log::set_logger failed: {err:#?}");
+    }
+
     let mut app_context = RtAudioEffect::new();
     app_context.run();
 
-    println!("Goodbye, world!");
+    println!("Goodbye RtAudioEffect!");
 }

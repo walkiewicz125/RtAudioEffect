@@ -12,16 +12,19 @@ use cpal::{
 };
 use log::{error, info, trace};
 
-use super::{AudioBuffer, AudioStreamConsumer, StreamParameters};
+use super::{AudioBuffer, AudioStreamConsumer, MixedChannelsSamples, StreamParameters};
+
+struct StreamConsumerHandler {
+    audio_buffer: Arc<Mutex<AudioBuffer>>,
+    stream_consumer: Arc<Mutex<dyn AudioStreamConsumer>>,
+}
 
 pub struct AudioDevice {
     device: Device,
     stream: Stream,
     parameters: Arc<StreamParameters>,
-    buffer_duration: Duration,
-    audio_buffer: Arc<Mutex<AudioBuffer>>,
-    data_receiver: Receiver<Vec<f32>>,
-    data_callback: Option<Arc<Mutex<dyn AudioStreamConsumer>>>,
+    data_receiver: Receiver<MixedChannelsSamples>,
+    consumers_handlers: Vec<StreamConsumerHandler>,
 }
 pub enum Overlap {
     None,
@@ -47,15 +50,7 @@ impl AudioDevice {
             channels,
         });
 
-        let buffer_duration = Duration::from_secs_f32(1.0);
-        let buffer_duration_in_samples: usize =
-            (sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
-        let audio_buffer = Arc::new(Mutex::new(AudioBuffer::new(
-            parameters.clone(),
-            buffer_duration_in_samples,
-        )));
-
-        let (data_sender, data_receiver) = mpsc::channel::<Vec<f32>>();
+        let (data_sender, data_receiver) = mpsc::channel::<MixedChannelsSamples>();
 
         let Ok(stream) = device.build_input_stream(
             &config.into(),
@@ -71,10 +66,8 @@ impl AudioDevice {
             device,
             stream,
             parameters,
-            buffer_duration,
-            audio_buffer,
             data_receiver,
-            data_callback: None,
+            consumers_handlers: vec![],
         })
     }
 
@@ -94,21 +87,36 @@ impl AudioDevice {
         }
     }
 
-    pub fn set_callback(
+    pub fn add_stream_consumer(
         &mut self,
         update_duration: Duration,
         overlap: Overlap,
-        data_consumer: Arc<Mutex<dyn AudioStreamConsumer>>,
+        stream_consumer: Arc<Mutex<dyn AudioStreamConsumer>>,
     ) {
-        self.data_callback = Some(data_consumer);
+        let buffer_duration = Duration::from_secs_f32(1.0);
+        let buffer_duration_in_samples: usize =
+            (self.parameters.sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
+
+        let audio_buffer = Arc::new(Mutex::new(AudioBuffer::new(
+            self.parameters.clone(),
+            buffer_duration_in_samples,
+        )));
+        let handler = StreamConsumerHandler {
+            audio_buffer,
+            stream_consumer,
+        };
+        self.consumers_handlers.push(handler);
     }
 
     pub fn run(&mut self) {
         while let Ok(new_data) = self.data_receiver.recv_timeout(Duration::from_secs(0)) {
-            self.audio_buffer.lock().unwrap().store(new_data.clone());
-
-            if let Some(callback) = &self.data_callback {
-                callback.lock().unwrap().process_new_samples(new_data)
+            for handler in &self.consumers_handlers {
+                handler.audio_buffer.lock().unwrap().store(new_data.clone());
+                handler
+                    .stream_consumer
+                    .lock()
+                    .unwrap()
+                    .process_new_samples(handler.audio_buffer.clone());
             }
         }
     }

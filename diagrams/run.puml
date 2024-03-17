@@ -1,0 +1,20 @@
+@startuml "run of processing"
+
+loop
+    RtAudioEffect -> AudioDevice : run()
+
+    loop until recv_timeout != Ok
+        AudioDevice -> cpal_Stream: recv_timeout(0)
+        AudioDevice <-- cpal_Stream : new_data
+
+        loop foreach handler in consumers_handlers
+            AudioDevice -> AudioStreamConsumer : process_new_samples(audio_buffer)
+            AudioDevice <-- AudioStreamConsumer
+        end
+
+    end
+
+    RtAudioEffect <-- AudioDevice
+end
+
+@enduml

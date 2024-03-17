@@ -1,0 +1,19 @@
+@startuml "processing new samples"
+
+AudioDevice -> StreamAnalyzer : process_new_samples(audio_buffer)
+
+StreamAnalyzer -> AudioBuffer : read_new_samples(refresh_time_in_samples, spectrum_width)
+StreamAnalyzer <-- AudioBuffer : new_samples: Vec<Vec<f32>>
+
+loop foreach channel in new_samples
+StreamAnalyzer -> SpectrumAnalyzer : analyze()
+StreamAnalyzer <- SpectrumAnalyzer : return Spectrum
+StreamAnalyzer -> StreamAnalyzer : add channel spectrum to spectrums:Vec<Spectrum>
+end
+
+StreamAnalyzer -> Spectrogram : push(spectrums)
+StreamAnalyzer <- Spectrogram
+
+AudioDevice <-- StreamAnalyzer
+
+@enduml

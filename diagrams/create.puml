@@ -1,0 +1,13 @@
+@startuml "sequence of creating app"
+
+RtAudioEffect -> AudioManager : get_default_loopback()
+AudioManager -> cpal : available_hosts()
+AudioManager <-- cpal : return
+RtAudioEffect <-- AudioManager : cpal_Device
+
+RtAudioEffect -> AudioDevice : new(cpal_Device)
+AudioDevice -> cpal_Device : build_input_stream()
+AudioDevice <-- cpal_Device : cpal_Stream
+RtAudioEffect <-- AudioDevice : return
+
+@enduml

@@ -31,7 +31,7 @@ impl RtAudioEffect {
     }
 
     pub fn run(&mut self) {
-        self.audio_device.set_callback(
+        self.audio_device.add_stream_consumer(
             Duration::from_secs_f32(0.1),
             crate::audio::Overlap::None,
             self.analyzer.clone(),

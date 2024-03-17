@@ -4,10 +4,15 @@ use log::{debug, warn};
 
 use super::StreamParameters;
 
+pub type Sample = f32;
+pub type MixedChannelsSamples = Vec<Sample>;
+pub type OneChannelSamples = Vec<Sample>;
+pub type ManyChannelsSamples = Vec<OneChannelSamples>;
+
 pub struct AudioBuffer {
     channels: u16,
     buffer_duration_in_samples: usize,
-    channels_buffers: Vec<Vec<f32>>,
+    channels_buffers: ManyChannelsSamples,
     new_samples_count: usize,
 }
 
@@ -26,7 +31,7 @@ impl AudioBuffer {
         }
     }
 
-    pub fn store(&mut self, data: Vec<f32>) {
+    pub fn store(&mut self, data: MixedChannelsSamples) {
         let new_samples = self.distribute_into_channels(data);
         self.trim_buffers();
 
@@ -47,7 +52,7 @@ impl AudioBuffer {
         &mut self,
         new_samples: usize,
         total_sample_count: usize,
-    ) -> Result<Vec<Vec<f32>>, String> {
+    ) -> Result<ManyChannelsSamples, String> {
         debug!(
             "reading samples. new_samples: {new_samples}, total_sample_count: {total_sample_count}"
         );
@@ -71,7 +76,7 @@ impl AudioBuffer {
                 + new_samples;
         let end_index = start_index + total_sample_count;
 
-        let mut channels_samples: Vec<Vec<f32>> = vec![];
+        let mut channels_samples: ManyChannelsSamples = ManyChannelsSamples::default();
 
         for channel_samples in &self.channels_buffers {
             let samples = channel_samples[start_index..end_index].to_vec();
@@ -96,7 +101,7 @@ impl AudioBuffer {
         }
     }
 
-    fn distribute_into_channels(&mut self, data: Vec<f32>) -> usize {
+    fn distribute_into_channels(&mut self, data: MixedChannelsSamples) -> usize {
         for i in 0..data.len() {
             let channel = i % self.channels as usize;
             self.channels_buffers[channel].push(data[i]);

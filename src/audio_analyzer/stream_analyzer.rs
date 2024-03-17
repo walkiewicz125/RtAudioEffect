@@ -1,12 +1,11 @@
-use std::{sync::Arc, time::Duration};
-
-use log::debug;
-use rustfft::{num_complex::Complex, Fft, FftPlanner};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
-use super::SpectrumAnalyzer;
-type Spectrum = Vec<f32>;
+use super::{ManyChannelsSpectrums, Spectrum, SpectrumAnalyzer};
 
 pub struct AnalyzerParameters {
     spectrum_width: usize,
@@ -16,7 +15,6 @@ pub struct AnalyzerParameters {
 
 pub struct Spectrogram {
     parameters: Arc<AnalyzerParameters>,
-    stream_parameters: Arc<StreamParameters>,
     spectrum_history: Vec<Vec<Spectrum>>,
 }
 impl Spectrogram {
@@ -31,34 +29,41 @@ impl Spectrogram {
             vec![empty_spectogram_one_channel; stream_parameters.channels as usize];
         Spectrogram {
             parameters,
-            stream_parameters,
             spectrum_history: empty_spectogram_all_channels,
+        }
+    }
+
+    fn push_spectrums(&mut self, spectrums: ManyChannelsSpectrums) {
+        self.spectrum_history.push(spectrums);
+
+        if self.spectrum_history.len() > self.parameters.number_of_spectrums_in_history {
+            let oversize =
+                self.spectrum_history.len() - self.parameters.number_of_spectrums_in_history;
+            self.spectrum_history.drain(0..oversize);
         }
     }
 }
 
 pub struct StreamAnalyzer {
     analyzer_parameters: Arc<AnalyzerParameters>,
-    stream_parameters: Arc<StreamParameters>,
     spectrum_analyzer: SpectrumAnalyzer,
     spectrogram: Spectrogram,
-    buffer: AudioBuffer,
 }
 
 impl AudioStreamConsumer for StreamAnalyzer {
-    fn process_new_samples(&mut self, channels_audio_samples: Vec<f32>) {
-        self.buffer.store(channels_audio_samples);
-        debug!("eeeeeeeeeee");
+    fn process_new_samples(&mut self, audio_buffer: Arc<Mutex<AudioBuffer>>) {
+        let mut buffer = audio_buffer.lock().unwrap();
 
-        if self.buffer.get_new_samples_count() >= self.analyzer_parameters.refresh_time_in_samples {
-            while let Ok(new_channels_samples) = self.buffer.read_new_samples(
+        if buffer.get_new_samples_count() >= self.analyzer_parameters.refresh_time_in_samples {
+            while let Ok(new_channels_samples) = buffer.read_new_samples(
                 self.analyzer_parameters.refresh_time_in_samples,
                 self.analyzer_parameters.spectrum_width,
             ) {
+                let mut spectrums = vec![];
                 for (channel, samples) in new_channels_samples.iter().enumerate() {
-                    self.spectrum_analyzer.analyze(&samples);
-                    debug!("ADADADADAD");
+                    spectrums.push(self.spectrum_analyzer.analyze(&samples));
                 }
+                self.spectrogram.push_spectrums(spectrums);
             }
         }
     }
@@ -85,13 +90,8 @@ impl StreamAnalyzer {
 
         StreamAnalyzer {
             analyzer_parameters: parameters.clone(),
-            stream_parameters: stream_parameters.clone(),
             spectrum_analyzer: SpectrumAnalyzer::new(spectrum_width),
             spectrogram: Spectrogram::new(parameters, stream_parameters.clone()),
-            buffer: AudioBuffer::new(
-                stream_parameters.clone(),
-                stream_parameters.sample_rate as usize,
-            ),
         }
     }
 }

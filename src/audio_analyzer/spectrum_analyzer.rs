@@ -2,7 +2,11 @@ use std::{sync::Arc, time::Duration};
 
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
-use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
+use crate::audio::{AudioBuffer, AudioStreamConsumer, OneChannelSamples, StreamParameters};
+
+pub type Spectrum = Vec<f32>;
+pub type ManyChannelsSpectrums = Vec<Spectrum>;
+type WindowWeitghts = Vec<f32>;
 
 pub struct SpectrumAnalyzer {
     spectrum_width: usize,
@@ -28,13 +32,13 @@ impl SpectrumAnalyzer {
         }
     }
 
-    fn generate_hanning_window(width: usize) -> Vec<f32> {
+    fn generate_hanning_window(width: usize) -> WindowWeitghts {
         apodize::hanning_iter(width)
             .map(|v| v as f32)
-            .collect::<Vec<f32>>()
+            .collect::<WindowWeitghts>()
     }
 
-    pub fn analyze(&mut self, new_samples: &Vec<f32>) -> Vec<f32> {
+    pub fn analyze(&mut self, new_samples: &OneChannelSamples) -> Spectrum {
         for i in 0..self.spectrum_width {
             self.work_buffer[i].re = new_samples[i] * self.window[i];
             self.work_buffer[i].im = 0.0;
