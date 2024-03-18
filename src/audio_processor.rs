@@ -6,14 +6,14 @@ use std::{
 use log::info;
 
 use crate::{
-    audio::{AudioDevice, AudioManager, AudioStreamConsumer},
-    audio_analyzer::StreamAnalyzer,
+    audio::{AudioDevice, AudioManager, StreamParameters},
+    audio_analyzer::{AnalyzerParameters, StreamAnalyzer},
     ui_controller::AudioAnalyzysProvider,
 };
 
 pub struct AudioProcessor {
     audio_device: AudioDevice,
-    analyzer: Arc<Mutex<dyn AudioStreamConsumer>>,
+    analyzer: Arc<Mutex<StreamAnalyzer>>,
 }
 
 impl AudioProcessor {
@@ -53,7 +53,15 @@ impl AudioProcessor {
     }
 }
 
-impl AudioAnalyzysProvider for AudioProcessor {}
+impl AudioAnalyzysProvider for AudioProcessor {
+    fn get_stream_parameters(&self) -> Arc<StreamParameters> {
+        self.audio_device.get_parameters().clone()
+    }
+
+    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
+        self.analyzer.lock().unwrap().get_analyzer_parameters()
+    }
+}
 
 impl Default for AudioProcessor {
     fn default() -> Self {

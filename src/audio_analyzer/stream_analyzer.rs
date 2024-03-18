@@ -57,4 +57,8 @@ impl StreamAnalyzer {
             spectrogram: Spectrogram::new(parameters, stream_parameters.clone()),
         }
     }
+
+    pub fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
+        self.analyzer_parameters.clone()
+    }
 }

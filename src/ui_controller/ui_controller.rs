@@ -3,10 +3,16 @@ use std::{
     time::Instant,
 };
 
-use egui::{FontId, TextStyle};
+use egui::{
+    load::SizedTexture, Align, CollapsingHeader, FontId, Image, Layout, Separator, TextStyle, Vec2,
+};
 use glfw::{Context, Glfw, WindowEvent};
 
-use crate::glfw_egui::{egui_glfw, glfw_painter};
+use crate::{
+    audio::StreamParameters,
+    audio_analyzer::{AnalyzerParameters, SpectrumAnalyzer},
+    glfw_egui::{egui_glfw, glfw_painter},
+};
 
 use super::{egui_helpers, helpers};
 
@@ -20,6 +26,35 @@ struct UiWindow {
     egui_context: egui::Context,
     egui_input_state: egui_glfw::EguiInputState,
     start_time: Instant,
+}
+fn show_stream_parameters(stream_parameters: Arc<StreamParameters>, ui: &mut egui::Ui) {
+    CollapsingHeader::new("Stream parameters")
+        .default_open(true)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Sample rate:");
+                ui.label(stream_parameters.sample_rate.to_string());
+            });
+            ui.horizontal(|ui| {
+                ui.label("Number of channels:");
+                ui.label(stream_parameters.channels.to_string());
+            })
+        });
+}
+
+fn show_spectrum_parameters(spectrum_parameters: Arc<AnalyzerParameters>, ui: &mut egui::Ui) {
+    CollapsingHeader::new("FFT parameters")
+        .default_open(true)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Spectrum width:");
+                ui.label(spectrum_parameters.spectrum_width.to_string());
+            });
+            ui.horizontal(|ui| {
+                ui.label("Refresh time in samples:");
+                ui.label(spectrum_parameters.refresh_time_in_samples.to_string());
+            });
+        });
 }
 
 impl UiWindow {
@@ -61,21 +96,6 @@ impl UiWindow {
         self.window.should_close()
     }
 
-    fn update(&mut self) {
-        if !self.window.should_close() {
-            self.egui_input_state.input.time = Some(self.start_time.elapsed().as_secs_f64());
-            self.egui_context
-                .begin_frame(self.egui_input_state.input.take());
-
-            self.draw_top_panel();
-
-            self.finalize_frame();
-
-            self.window.swap_buffers();
-            self.glfw_context.poll_events();
-        }
-    }
-
     fn draw_top_panel(&mut self) {
         egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
             ui.menu_button("File", |ui| {
@@ -84,6 +104,12 @@ impl UiWindow {
                 let _ = ui.button("test 1");
             })
         });
+    }
+
+    fn begin_frame(&mut self) {
+        self.egui_input_state.input.time = Some(self.start_time.elapsed().as_secs_f64());
+        self.egui_context
+            .begin_frame(self.egui_input_state.input.take());
     }
 
     fn finalize_frame(&mut self) {
@@ -125,6 +151,65 @@ impl UiWindow {
                 }
             }
         }
+
+        self.window.swap_buffers();
+        self.glfw_context.poll_events();
+    }
+
+    fn draw_central_panel(
+        &mut self,
+        audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+    ) {
+        egui::CentralPanel::default().show(&self.egui_context, |ui| {
+            ui.horizontal_top(|ui| {
+                ui.allocate_ui_with_layout(
+                    Vec2 {
+                        x: 250.0,
+                        y: ui.available_height(),
+                    },
+                    Layout::top_down(Align::LEFT),
+                    |ui| {
+                        // TODO: show stream parameters
+                        show_stream_parameters(
+                            audio_analyzis_provider
+                                .lock()
+                                .unwrap()
+                                .get_stream_parameters(),
+                            ui,
+                        );
+                        ui.separator();
+                        show_spectrum_parameters(
+                            audio_analyzis_provider
+                                .lock()
+                                .unwrap()
+                                .get_analyzer_parameters(),
+                            ui,
+                        );
+                        ui.separator();
+                        // TODO: show spectrum editor
+                        ui.separator();
+
+                        ui.strong("Stream control:");
+                        ui.columns(2, |uis| {
+                            if uis[0].button("Start").clicked() {
+                                // TODO: Start stream
+                            }
+                            if uis[1].button("Stop").clicked() {
+                                // TODO: Stop stream
+                            }
+                        })
+                    },
+                );
+
+                // Render spectrum
+                ui.add(Separator::default().vertical());
+                // TODO:
+                // ui.add(Image::from_texture(SizedTexture {
+                //     id: self.ui_controller.spectrum_texture,
+                //     size: ui.available_size(),
+                // }));
+            })
+        });
     }
 }
 
@@ -132,7 +217,10 @@ pub struct UiController {
     window: UiWindow,
     audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
 }
-pub trait AudioAnalyzysProvider {}
+pub trait AudioAnalyzysProvider {
+    fn get_stream_parameters(&self) -> Arc<StreamParameters>;
+    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
+}
 
 impl UiController {
     pub fn new(
@@ -148,7 +236,13 @@ impl UiController {
     }
 
     pub fn update(&mut self) {
-        self.window.update()
+        if !self.window.should_close() {
+            self.window.begin_frame();
+            self.window.draw_top_panel();
+            self.window
+                .draw_central_panel(self.audio_analyzis_provider.clone());
+            self.window.finalize_frame();
+        }
     }
 
     pub fn is_closing(&self) -> bool {

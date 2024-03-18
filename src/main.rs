@@ -35,6 +35,7 @@ fn main() {
     audio_processor.lock().unwrap().start();
 
     let start_time = Instant::now();
+
     // for tests
     while (Instant::now() - start_time) < Duration::from_secs_f32(3.0) {
         audio_processor.lock().unwrap().update();
