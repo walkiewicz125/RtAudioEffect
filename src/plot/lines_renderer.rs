@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec2, Vec3, Vec4};
+use glam::{Mat4, Vec2, Vec4};
 
 use super::{
     lines_shader::LinesShader, primitives::storage_buffer::StorageBuffer, renderer::Renderer,

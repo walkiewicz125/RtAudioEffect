@@ -4,7 +4,7 @@ use cpal::{
     Device,
 };
 
-use log::{debug, error, info, trace, warn};
+use log::{debug, info};
 
 pub struct AudioManager {}
 

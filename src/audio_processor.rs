@@ -3,13 +3,16 @@ use std::{
     time::Duration,
 };
 
-use log::info;
-
 use crate::{
     audio::{AudioDevice, AudioManager, StreamParameters},
-    audio_analyzer::{AnalyzerParameters, ManyChannelsSpectrums, Spectrum, StreamAnalyzer},
-    ui_controller::AudioAnalyzysProvider,
+    audio_analyzer::{AnalyzerParameters, ManyChannelsSpectrums, StreamAnalyzer},
 };
+
+pub trait AudioAnalyzysProvider {
+    fn get_stream_parameters(&self) -> Arc<StreamParameters>;
+    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
+    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
+}
 
 pub struct AudioProcessor {
     audio_device: AudioDevice,
@@ -28,12 +31,7 @@ impl AudioProcessor {
             audio_device_parameters,
         )));
 
-        audio_device.add_stream_consumer(
-            Duration::from_secs_f32(0.1),
-            crate::audio::Overlap::None,
-            analyzer.clone(),
-            Some(String::from("Spectrum Analyzer")),
-        );
+        audio_device.add_stream_consumer(analyzer.clone(), Some(String::from("Spectrum Analyzer")));
 
         AudioProcessor {
             audio_device,

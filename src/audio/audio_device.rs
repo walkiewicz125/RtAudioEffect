@@ -10,7 +10,7 @@ use cpal::{
     traits::{DeviceTrait, StreamTrait},
     Device, InputCallbackInfo, Stream,
 };
-use log::{debug, error, info, trace};
+use log::{debug, error, info};
 
 use super::{AudioBuffer, AudioStreamConsumer, MixedChannelsSamples, StreamParameters};
 
@@ -21,16 +21,13 @@ struct StreamConsumerHandler {
 }
 
 pub struct AudioDevice {
-    device: Device,
+    _device: Device,
     stream: Stream,
     parameters: Arc<StreamParameters>,
     data_receiver: Receiver<MixedChannelsSamples>,
     consumers_handlers: Vec<StreamConsumerHandler>,
 }
-pub enum Overlap {
-    None,
-    Half,
-}
+
 impl AudioDevice {
     pub fn new(device: Device) -> Result<AudioDevice, &'static str> {
         let Ok(config) = device.default_output_config() else {
@@ -67,7 +64,7 @@ impl AudioDevice {
         };
 
         Ok(AudioDevice {
-            device,
+            _device: device,
             stream,
             parameters,
             data_receiver,
@@ -93,8 +90,6 @@ impl AudioDevice {
 
     pub fn add_stream_consumer(
         &mut self,
-        update_duration: Duration,
-        overlap: Overlap,
         stream_consumer: Arc<Mutex<dyn AudioStreamConsumer>>,
         consumer_name: Option<String>,
     ) {

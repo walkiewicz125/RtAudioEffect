@@ -26,7 +26,7 @@ impl ShaderProgram {
         let vertex = vertex.unwrap();
         let fragment = fragment.unwrap();
 
-        let mut program_id: u32 = 0;
+        let program_id: u32;
 
         unsafe {
             program_id = gl::CreateProgram();

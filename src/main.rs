@@ -7,13 +7,9 @@ mod audio;
 mod audio_analyzer;
 mod audio_processor;
 use audio_processor::AudioProcessor;
-use log::debug;
 use ui_controller::Resolution;
 
-use std::{
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
+use std::sync::{Arc, Mutex};
 
 use crate::ui_controller::UiController;
 

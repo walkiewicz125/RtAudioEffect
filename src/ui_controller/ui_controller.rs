@@ -10,8 +10,7 @@ use egui::{
 use glfw::{Context, Glfw, WindowEvent};
 
 use crate::{
-    audio::StreamParameters,
-    audio_analyzer::{AnalyzerParameters, ManyChannelsSpectrums, Spectrum, SpectrumAnalyzer},
+    audio_processor::AudioAnalyzysProvider,
     glfw_egui::{egui_glfw, glfw_painter},
     plot::{BarSpectrumRenderer, TextureRenderTarget},
 };
@@ -28,35 +27,6 @@ struct UiWindow {
     egui_context: egui::Context,
     egui_input_state: egui_glfw::EguiInputState,
     start_time: Instant,
-}
-fn show_stream_parameters(stream_parameters: Arc<StreamParameters>, ui: &mut egui::Ui) {
-    CollapsingHeader::new("Stream parameters")
-        .default_open(true)
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Sample rate:");
-                ui.label(stream_parameters.sample_rate.to_string());
-            });
-            ui.horizontal(|ui| {
-                ui.label("Number of channels:");
-                ui.label(stream_parameters.channels.to_string());
-            })
-        });
-}
-
-fn show_spectrum_parameters(spectrum_parameters: Arc<AnalyzerParameters>, ui: &mut egui::Ui) {
-    CollapsingHeader::new("FFT parameters")
-        .default_open(true)
-        .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Spectrum width:");
-                ui.label(spectrum_parameters.spectrum_width.to_string());
-            });
-            ui.horizontal(|ui| {
-                ui.label("Refresh time in samples:");
-                ui.label(spectrum_parameters.refresh_time_in_samples.to_string());
-            });
-        });
 }
 
 impl UiWindow {
@@ -157,12 +127,6 @@ impl UiWindow {
     }
 }
 
-pub trait AudioAnalyzysProvider {
-    fn get_stream_parameters(&self) -> Arc<StreamParameters>;
-    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
-    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
-}
-
 struct UiSpectrumRenderer {
     spectrum_renderer: BarSpectrumRenderer,
     spectrum_texture_renderer: TextureRenderTarget,
@@ -253,6 +217,100 @@ impl UiController {
     }
 
     fn draw_central_panel(&mut self) {
+        let analyzer_parmeters = self
+            .audio_analyzis_provider
+            .lock()
+            .unwrap()
+            .get_analyzer_parameters();
+        let stream_parameters = self
+            .audio_analyzis_provider
+            .lock()
+            .unwrap()
+            .get_stream_parameters();
+
+        let draw_stream_parameters = |ui: &mut Ui| {
+            CollapsingHeader::new("Stream parameters")
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Sample rate:");
+                        ui.label(stream_parameters.sample_rate.to_string());
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Number of channels:");
+                        ui.label(stream_parameters.channels.to_string());
+                    })
+                });
+        };
+
+        let draw_analyzer_parameters = |ui: &mut Ui| {
+            CollapsingHeader::new("Analyzer parameters")
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Refresh time:");
+                        ui.label(analyzer_parmeters.refresh_time.as_millis().to_string() + " ms");
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Spectrogram durations:");
+                        ui.label(
+                            analyzer_parmeters
+                                .spectrogram_duration
+                                .as_secs_f32()
+                                .to_string()
+                                + " s",
+                        );
+                    });
+                });
+        };
+
+        let draw_fft_parameters = |ui: &mut Ui| {
+            CollapsingHeader::new("FFT parameters")
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Spectrum width:");
+                        ui.label(analyzer_parmeters.spectrum_width.to_string());
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("Refresh time in samples:");
+                        ui.label(analyzer_parmeters.refresh_time_in_samples.to_string());
+                    });
+                });
+        };
+
+        let draw_stream_controls = |ui: &mut Ui| {
+            ui.strong("Stream control:");
+            ui.columns(2, |uis| {
+                if uis[0].button("Start").clicked() {
+                    // TODO: Start stream
+                }
+                if uis[1].button("Stop").clicked() {
+                    // TODO: Stop stream
+                }
+            })
+        };
+
+        let draw_parameters_and_control_panel = |ui: &mut Ui| {
+            draw_stream_parameters(ui);
+            ui.separator();
+
+            draw_analyzer_parameters(ui);
+            ui.separator();
+
+            draw_fft_parameters(ui);
+            ui.separator();
+
+            draw_stream_controls(ui);
+        };
+
+        let mut draw_spectrum = |ui: &mut Ui| {
+            ui.columns(2, |uis| {
+                self.spectrum_texture_renderer_left.render(&mut uis[0]);
+                self.spectrum_texture_renderer_right.render(&mut uis[1]);
+            });
+        };
+
         self.window.central_panel(|ui| {
             ui.horizontal_top(|ui| {
                 ui.allocate_ui_with_layout(
@@ -261,45 +319,12 @@ impl UiController {
                         y: ui.available_height(),
                     },
                     Layout::top_down(Align::LEFT),
-                    |ui| {
-                        // TODO: show stream parameters
-                        show_stream_parameters(
-                            self.audio_analyzis_provider
-                                .lock()
-                                .unwrap()
-                                .get_stream_parameters(),
-                            ui,
-                        );
-                        ui.separator();
-                        show_spectrum_parameters(
-                            self.audio_analyzis_provider
-                                .lock()
-                                .unwrap()
-                                .get_analyzer_parameters(),
-                            ui,
-                        );
-                        ui.separator();
-                        // TODO: show spectrum editor
-                        ui.separator();
-
-                        ui.strong("Stream control:");
-                        ui.columns(2, |uis| {
-                            if uis[0].button("Start").clicked() {
-                                // TODO: Start stream
-                            }
-                            if uis[1].button("Stop").clicked() {
-                                // TODO: Stop stream
-                            }
-                        })
-                    },
+                    draw_parameters_and_control_panel,
                 );
 
-                // Render spectrum
                 ui.add(Separator::default().vertical());
-                ui.columns(2, |uis| {
-                    self.spectrum_texture_renderer_left.render(&mut uis[0]);
-                    self.spectrum_texture_renderer_right.render(&mut uis[1]);
-                });
+
+                draw_spectrum(ui);
             })
         });
     }
