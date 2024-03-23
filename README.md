@@ -5,6 +5,7 @@ Current view of application.
 ## Realy short status
 ### Current functionality:
 - Calculating spectrum of default loopback device.
+- Rendering current spectrum
 - Saving spectrum history.
 
 ### ToDo:
