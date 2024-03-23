@@ -4,14 +4,16 @@ use std::{
 };
 
 use egui::{
-    load::SizedTexture, Align, CollapsingHeader, FontId, Image, Layout, Separator, TextStyle, Vec2,
+    load::SizedTexture, Align, CollapsingHeader, FontId, Image, InnerResponse, Layout, Separator,
+    TextStyle, TextureId, Ui, Vec2,
 };
 use glfw::{Context, Glfw, WindowEvent};
 
 use crate::{
     audio::StreamParameters,
-    audio_analyzer::{AnalyzerParameters, SpectrumAnalyzer},
+    audio_analyzer::{AnalyzerParameters, ManyChannelsSpectrums, Spectrum, SpectrumAnalyzer},
     glfw_egui::{egui_glfw, glfw_painter},
+    plot::{BarSpectrumRenderer, TextureRenderTarget},
 };
 
 use super::{egui_helpers, helpers};
@@ -96,16 +98,6 @@ impl UiWindow {
         self.window.should_close()
     }
 
-    fn draw_top_panel(&mut self) {
-        egui::TopBottomPanel::top("Top").show(&self.egui_context, |ui| {
-            ui.menu_button("File", |ui| {
-                let _ = ui.button("test 1");
-                ui.separator();
-                let _ = ui.button("test 1");
-            })
-        });
-    }
-
     fn begin_frame(&mut self) {
         self.egui_input_state.input.time = Some(self.start_time.elapsed().as_secs_f64());
         self.egui_context
@@ -156,11 +148,109 @@ impl UiWindow {
         self.glfw_context.poll_events();
     }
 
-    fn draw_central_panel(
+    fn central_panel<R>(&mut self, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+        egui::CentralPanel::default().show(&self.egui_context, add_contents)
+    }
+
+    fn top_panel<R>(&mut self, add_contents: impl FnOnce(&mut Ui) -> R) -> InnerResponse<R> {
+        egui::TopBottomPanel::top("Top").show(&self.egui_context, add_contents)
+    }
+}
+
+pub trait AudioAnalyzysProvider {
+    fn get_stream_parameters(&self) -> Arc<StreamParameters>;
+    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
+    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
+}
+
+struct UiSpectrumRenderer {
+    spectrum_renderer: BarSpectrumRenderer,
+    spectrum_texture_renderer: TextureRenderTarget,
+    spectrum_tex_id: TextureId,
+}
+
+impl UiSpectrumRenderer {
+    fn new(ui_window: &mut UiWindow) -> UiSpectrumRenderer {
+        let mut spectrum_renderer = BarSpectrumRenderer::new();
+        let spectrum_texture_renderer = TextureRenderTarget::new((1, 1));
+
+        let spectrum_tex_id = ui_window
+            .painter
+            .new_opengl_texture(spectrum_texture_renderer.get_texture_id());
+        spectrum_renderer.flip_vertically(true);
+
+        UiSpectrumRenderer {
+            spectrum_renderer,
+            spectrum_texture_renderer,
+            spectrum_tex_id,
+        }
+    }
+    fn update_spectrum(
         &mut self,
-        audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+        spectrum_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+        channel_number: usize,
     ) {
-        egui::CentralPanel::default().show(&self.egui_context, |ui| {
+        let spectrum =
+            spectrum_provider.lock().unwrap().get_latest_spectrum()[channel_number].clone();
+        self.spectrum_renderer.set_spectrum(spectrum.as_slice());
+        self.spectrum_renderer.set_style(0)
+    }
+
+    fn render(&mut self, ui: &mut Ui) {
+        unsafe {
+            gl::ClearColor(0.455, 0.302, 0.663, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
+        let convert_vec2_to_tuple = |resolution: Vec2| (resolution.x as u32, resolution.y as u32);
+        let resolution = convert_vec2_to_tuple(ui.available_size());
+        self.spectrum_renderer.set_view(resolution);
+        self.spectrum_texture_renderer.set_resolution(resolution);
+        self.spectrum_texture_renderer
+            .render(&self.spectrum_renderer);
+        ui.add(Image::from_texture(SizedTexture {
+            id: self.spectrum_tex_id,
+            size: ui.available_size(),
+        }));
+    }
+}
+
+pub struct UiController {
+    window: UiWindow,
+    audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+    spectrum_texture_renderer: UiSpectrumRenderer,
+}
+
+impl UiController {
+    pub fn new(
+        audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+        resolution: Resolution,
+    ) -> UiController {
+        let mut window = UiWindow::new(resolution);
+        let spectrum_texture_renderer = UiSpectrumRenderer::new(&mut window);
+
+        UiController {
+            window,
+            audio_analyzis_provider,
+            spectrum_texture_renderer,
+        }
+    }
+
+    pub fn is_closing(&self) -> bool {
+        self.window.should_close()
+    }
+
+    fn draw_top_panel(&mut self) {
+        self.window.top_panel(|ui| {
+            ui.menu_button("File", |ui| {
+                let _ = ui.button("test 1");
+                ui.separator();
+                let _ = ui.button("test 1");
+            })
+        });
+    }
+
+    fn draw_central_panel(&mut self) {
+        self.window.central_panel(|ui| {
             ui.horizontal_top(|ui| {
                 ui.allocate_ui_with_layout(
                     Vec2 {
@@ -171,7 +261,7 @@ impl UiWindow {
                     |ui| {
                         // TODO: show stream parameters
                         show_stream_parameters(
-                            audio_analyzis_provider
+                            self.audio_analyzis_provider
                                 .lock()
                                 .unwrap()
                                 .get_stream_parameters(),
@@ -179,7 +269,7 @@ impl UiWindow {
                         );
                         ui.separator();
                         show_spectrum_parameters(
-                            audio_analyzis_provider
+                            self.audio_analyzis_provider
                                 .lock()
                                 .unwrap()
                                 .get_analyzer_parameters(),
@@ -203,49 +293,22 @@ impl UiWindow {
 
                 // Render spectrum
                 ui.add(Separator::default().vertical());
-                // TODO:
-                // ui.add(Image::from_texture(SizedTexture {
-                //     id: self.ui_controller.spectrum_texture,
-                //     size: ui.available_size(),
-                // }));
+                self.spectrum_texture_renderer.render(ui);
             })
         });
     }
-}
 
-pub struct UiController {
-    window: UiWindow,
-    audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
-}
-pub trait AudioAnalyzysProvider {
-    fn get_stream_parameters(&self) -> Arc<StreamParameters>;
-    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
-}
-
-impl UiController {
-    pub fn new(
-        audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
-        resolution: Resolution,
-    ) -> UiController {
-        let window = UiWindow::new(resolution);
-
-        UiController {
-            window,
-            audio_analyzis_provider,
-        }
-    }
-
-    pub fn update(&mut self) {
+    pub fn render(&mut self) {
         if !self.window.should_close() {
+            self.spectrum_texture_renderer
+                .update_spectrum(self.audio_analyzis_provider.clone(), 1);
+
             self.window.begin_frame();
-            self.window.draw_top_panel();
-            self.window
-                .draw_central_panel(self.audio_analyzis_provider.clone());
+
+            self.draw_top_panel();
+            self.draw_central_panel();
+
             self.window.finalize_frame();
         }
-    }
-
-    pub fn is_closing(&self) -> bool {
-        self.window.should_close()
     }
 }

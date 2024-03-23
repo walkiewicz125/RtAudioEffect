@@ -53,18 +53,16 @@ impl AudioBuffer {
         new_samples: usize,
         total_sample_count: usize,
     ) -> Result<ManyChannelsSamples, String> {
-        debug!(
-            "reading samples. new_samples: {new_samples}, total_sample_count: {total_sample_count}"
-        );
+        debug!("Getting {total_sample_count} for all channels, with new samples: {new_samples}");
 
         assert!(
             new_samples < total_sample_count,
-            "total_sample_count have to be greater than new_samples"
+            "Total_sample_count have to be greater than new_samples"
         );
 
         assert!(
             total_sample_count < self.buffer_duration_in_samples,
-            "total_sample_count have to be lesser than buffer_duration_in_samples"
+            "Total_sample_count have to be lesser than buffer_duration_in_samples"
         );
 
         if self.new_samples_count < new_samples {
@@ -89,23 +87,32 @@ impl AudioBuffer {
     }
 
     fn trim_buffers(&mut self) {
-        for buffer in &mut self.channels_buffers {
+        for (channel, buffer) in self.channels_buffers.iter_mut().enumerate() {
             if buffer.len() > self.buffer_duration_in_samples {
                 let oversize = buffer.len() - self.buffer_duration_in_samples;
                 buffer.drain(0..oversize);
+                debug!("Trimming buffer[{channel}] by {oversize}");
             }
             assert!(
                 buffer.len() <= self.buffer_duration_in_samples,
-                "buffer didn't shrink"
+                "buffer {channel} didn't shrink"
             );
         }
     }
 
     fn distribute_into_channels(&mut self, data: MixedChannelsSamples) -> usize {
-        for i in 0..data.len() {
-            let channel = i % self.channels as usize;
-            self.channels_buffers[channel].push(data[i]);
+        let new_samples_per_channel = data.len() / self.channels as usize;
+        debug!(
+            "Distributing samples into separate channels. Channel count {}, new sample count per channel {}",
+            self.channels,
+            new_samples_per_channel
+        );
+
+        for (sample_number, sample) in data.into_iter().enumerate() {
+            let channel = sample_number % self.channels as usize;
+            self.channels_buffers[channel].push(sample);
         }
-        data.len() / self.channels as usize
+
+        new_samples_per_channel
     }
 }

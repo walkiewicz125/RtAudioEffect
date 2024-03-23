@@ -7,7 +7,7 @@ use log::info;
 
 use crate::{
     audio::{AudioDevice, AudioManager, StreamParameters},
-    audio_analyzer::{AnalyzerParameters, StreamAnalyzer},
+    audio_analyzer::{AnalyzerParameters, ManyChannelsSpectrums, Spectrum, StreamAnalyzer},
     ui_controller::AudioAnalyzysProvider,
 };
 
@@ -24,7 +24,7 @@ impl AudioProcessor {
         let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
             Duration::from_secs_f32(0.01),
             Duration::from_secs_f32(1.0),
-            1024,
+            4800,
             audio_device_parameters,
         )));
 
@@ -32,6 +32,7 @@ impl AudioProcessor {
             Duration::from_secs_f32(0.1),
             crate::audio::Overlap::None,
             analyzer.clone(),
+            Some(String::from("Spectrum Analyzer")),
         );
 
         AudioProcessor {
@@ -60,6 +61,10 @@ impl AudioAnalyzysProvider for AudioProcessor {
 
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
         self.analyzer.lock().unwrap().get_analyzer_parameters()
+    }
+
+    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
+        self.analyzer.lock().unwrap().get_latest_spectrum()
     }
 }
 

@@ -3,9 +3,11 @@ use std::{
     time::Duration,
 };
 
+use log::{debug, error, trace};
+
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
-use super::{AnalyzerParameters, Spectrogram, SpectrumAnalyzer};
+use super::{AnalyzerParameters, ManyChannelsSpectrums, Spectrogram, SpectrumAnalyzer};
 
 pub struct StreamAnalyzer {
     analyzer_parameters: Arc<AnalyzerParameters>,
@@ -15,15 +17,23 @@ pub struct StreamAnalyzer {
 
 impl AudioStreamConsumer for StreamAnalyzer {
     fn process_new_samples(&mut self, audio_buffer: Arc<Mutex<AudioBuffer>>) {
+        debug!("Processing new samples");
         let mut buffer = audio_buffer.lock().unwrap();
 
-        if buffer.get_new_samples_count() >= self.analyzer_parameters.refresh_time_in_samples {
-            while let Ok(new_channels_samples) = buffer.read_new_samples(
-                self.analyzer_parameters.refresh_time_in_samples,
-                self.analyzer_parameters.spectrum_width,
-            ) {
+        let total_sample_count = self.analyzer_parameters.spectrum_width;
+        let new_samples = self.analyzer_parameters.refresh_time_in_samples;
+
+        while buffer.get_new_samples_count() >= new_samples {
+            if let Ok(new_multichannel_samples) =
+                buffer.read_new_samples(new_samples, total_sample_count)
+            {
+                debug!(
+                    "Reading {} samples for all channels, with new samples: {}",
+                    total_sample_count, new_samples
+                );
                 let mut spectrums = vec![];
-                for (channel, samples) in new_channels_samples.iter().enumerate() {
+                for (channel, samples) in new_multichannel_samples.iter().enumerate() {
+                    debug!("Processing samples for channel: {}", channel);
                     spectrums.push(self.spectrum_analyzer.analyze(&samples));
                 }
                 self.spectrogram.push_spectrums(spectrums);
@@ -60,5 +70,9 @@ impl StreamAnalyzer {
 
     pub fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
         self.analyzer_parameters.clone()
+    }
+
+    pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
+        self.spectrogram.get_latest_spectrum()
     }
 }

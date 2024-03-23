@@ -7,6 +7,7 @@ mod audio;
 mod audio_analyzer;
 mod audio_processor;
 use audio_processor::AudioProcessor;
+use log::debug;
 use ui_controller::Resolution;
 
 use std::{
@@ -24,7 +25,7 @@ fn main() {
     println!("Hello RtAudioEffect!");
 
     if let Err(err) =
-        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Trace))
     {
         eprintln!("log::set_logger failed: {err:#?}");
     }
@@ -34,16 +35,9 @@ fn main() {
 
     audio_processor.lock().unwrap().start();
 
-    let start_time = Instant::now();
-
-    // for tests
-    while (Instant::now() - start_time) < Duration::from_secs_f32(3.0) {
+    while !ui_controller.is_closing() {
         audio_processor.lock().unwrap().update();
-        if ui_controller.is_closing() {
-            break;
-        } else {
-            ui_controller.update();
-        }
+        ui_controller.render();
     }
     audio_processor.lock().unwrap().stop();
 

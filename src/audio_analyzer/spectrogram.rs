@@ -34,4 +34,8 @@ impl Spectrogram {
             self.spectrum_history.drain(0..oversize);
         }
     }
+
+    pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
+        self.spectrum_history.last().unwrap().clone()
+    }
 }

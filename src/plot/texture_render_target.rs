@@ -80,28 +80,32 @@ impl TextureRenderTarget {
     }
 
     pub fn set_resolution(&mut self, resolution: (u32, u32)) {
-        self.resolution = resolution;
-        unsafe {
-            gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer_name);
+        if resolution != self.resolution {
+            self.resolution = resolution;
+            unsafe {
+                gl::BindFramebuffer(gl::FRAMEBUFFER, self.frame_buffer_name);
 
-            // "Bind" the newly created texture : all future texture functions will modify this texture
-            gl::BindTexture(gl::TEXTURE_2D, self.rendered_texture);
+                // "Bind" the newly created texture : all future texture functions will modify this texture
+                gl::BindTexture(gl::TEXTURE_2D, self.rendered_texture);
 
-            // Give an empty image to OpenGL ( the last "0" )
-            gl::TexImage2D(
-                gl::TEXTURE_2D,
-                0,
-                gl::RGB as i32,
-                resolution.0 as i32,
-                resolution.1 as i32,
-                0,
-                gl::RGB,
-                gl::UNSIGNED_BYTE,
-                std::ptr::null(),
-            );
+                // Give an empty image to OpenGL ( the last "0" )
+                gl::TexImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    gl::RGB as i32,
+                    resolution.0 as i32,
+                    resolution.1 as i32,
+                    0,
+                    gl::RGB,
+                    gl::UNSIGNED_BYTE,
+                    std::ptr::null(),
+                );
 
-            gl::BindTexture(gl::TEXTURE_2D, 0);
-            gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+                gl::BindTexture(gl::TEXTURE_2D, 0);
+                gl::BindFramebuffer(gl::FRAMEBUFFER, 0);
+            }
+
+            // TODO: redraw?
         }
     }
 }
