@@ -1,99 +1,118 @@
-use std::time::Duration;
+use std::sync::Arc;
+
+use log::{debug, warn};
+
+use super::StreamParameters;
+
+pub type Sample = f32;
+pub type MixedChannelsSamples = Vec<Sample>;
+pub type OneChannelSamples = Vec<Sample>;
+pub type ManyChannelsSamples = Vec<OneChannelSamples>;
 
 pub struct AudioBuffer {
-    sample_rate: u32,
     channels: u16,
-    buffer_duration: Duration,
     buffer_duration_in_samples: usize,
-
-    buffers: Vec<Vec<f32>>,
-    new_sample_count: u32,
+    channels_buffers: ManyChannelsSamples,
+    new_samples_count: usize,
 }
 
-// public interface
 impl AudioBuffer {
-    pub fn new(sample_rate: u32, channels: u16, buffer_duration: Duration) -> AudioBuffer {
-        let buffer_duration_in_samples: usize =
-            (sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
+    pub fn new(
+        stream_parameters: Arc<StreamParameters>,
+        buffer_duration_in_samples: usize,
+    ) -> AudioBuffer {
+        let empty_channels_buffers =
+            vec![vec![0.0; buffer_duration_in_samples]; stream_parameters.channels as usize];
         AudioBuffer {
-            sample_rate,
-            channels,
-            buffer_duration,
+            channels: stream_parameters.channels,
             buffer_duration_in_samples,
-            buffers: vec![vec![0.0; buffer_duration_in_samples]; channels as usize],
-            new_sample_count: 0,
+            channels_buffers: empty_channels_buffers,
+            new_samples_count: 0,
         }
     }
 
-    pub fn store(&mut self, data: Vec<f32>) {
-        let new_samples = self.split_channels(data);
+    pub fn store(&mut self, data: MixedChannelsSamples) {
+        let new_samples = self.distribute_into_channels(data);
         self.trim_buffers();
-        self.new_sample_count += new_samples;
-        if self.new_sample_count > self.buffer_duration_in_samples as u32 {
-            self.new_sample_count = self.buffer_duration_in_samples as u32;
+
+        self.new_samples_count += new_samples;
+        if self.new_samples_count > self.buffer_duration_in_samples {
+            let overrun = self.new_samples_count - self.buffer_duration_in_samples;
+            self.new_samples_count = self.buffer_duration_in_samples;
+
+            warn!("Buffer overrun by: {overrun:#?}");
         }
     }
 
-    pub fn peek_channel(&self, channel: u16) -> Vec<f32> {
-        self.buffers[channel as usize].clone()
+    pub fn get_new_samples_count(&self) -> usize {
+        self.new_samples_count
     }
 
-    pub fn fetch_with_overlap(
+    pub fn read_new_samples(
         &mut self,
-        channel: u16,
-        sample_count: usize,
-        overlap_count: usize,
-    ) -> Vec<f32> {
+        new_samples: usize,
+        total_sample_count: usize,
+    ) -> Result<ManyChannelsSamples, String> {
+        debug!("Getting {total_sample_count} for all channels, with new samples: {new_samples}");
+
         assert!(
-            overlap_count < sample_count,
-            "sample_count have to be greater than overlap_count"
+            new_samples < total_sample_count,
+            "Total_sample_count have to be greater than new_samples"
         );
 
-        if self.new_sample_count < (sample_count - overlap_count) as u32 {
-            return vec![];
+        assert!(
+            total_sample_count < self.buffer_duration_in_samples,
+            "Total_sample_count have to be lesser than buffer_duration_in_samples"
+        );
+
+        if self.new_samples_count < new_samples {
+            return Err(String::from("Not enough new data"));
         }
 
-        if let Some(v) = self
-            .buffer_duration_in_samples
-            .checked_sub(self.new_sample_count as usize)
-        {
-            if let Some(v2) = v.checked_sub(overlap_count) {
-                let end_index = v2 + sample_count;
-                let data = self.buffers[channel as usize][v2..end_index].to_vec();
-                self.new_sample_count -= (sample_count - overlap_count) as u32;
-                return data;
-            } else {
-                let end_index = v + sample_count;
-                let data = self.buffers[channel as usize][v..end_index].to_vec();
-                self.new_sample_count -= (sample_count - overlap_count) as u32;
-                return data;
-            }
+        let start_index =
+            self.buffer_duration_in_samples - self.new_samples_count - total_sample_count
+                + new_samples;
+        let end_index = start_index + total_sample_count;
+
+        let mut channels_samples: ManyChannelsSamples = ManyChannelsSamples::default();
+
+        for channel_samples in &self.channels_buffers {
+            let samples = channel_samples[start_index..end_index].to_vec();
+            channels_samples.push(samples);
         }
 
-        return vec![];
+        self.new_samples_count -= new_samples;
+
+        Ok(channels_samples)
     }
-}
 
-// private implementation
-impl AudioBuffer {
     fn trim_buffers(&mut self) {
-        for buffer in &mut self.buffers {
+        for (channel, buffer) in self.channels_buffers.iter_mut().enumerate() {
             if buffer.len() > self.buffer_duration_in_samples {
                 let oversize = buffer.len() - self.buffer_duration_in_samples;
                 buffer.drain(0..oversize);
+                debug!("Trimming buffer[{channel}] by {oversize}");
             }
             assert!(
                 buffer.len() <= self.buffer_duration_in_samples,
-                "buffer didn't shrink"
+                "buffer {channel} didn't shrink"
             );
         }
     }
 
-    fn split_channels(&mut self, data: Vec<f32>) -> u32 {
-        for i in 0..data.len() {
-            let channel = i % self.channels as usize;
-            self.buffers[channel].push(data[i]);
+    fn distribute_into_channels(&mut self, data: MixedChannelsSamples) -> usize {
+        let new_samples_per_channel = data.len() / self.channels as usize;
+        debug!(
+            "Distributing samples into separate channels. Channel count {}, new sample count per channel {}",
+            self.channels,
+            new_samples_per_channel
+        );
+
+        for (sample_number, sample) in data.into_iter().enumerate() {
+            let channel = sample_number % self.channels as usize;
+            self.channels_buffers[channel].push(sample);
         }
-        data.len() as u32 / self.channels as u32
+
+        new_samples_per_channel
     }
 }

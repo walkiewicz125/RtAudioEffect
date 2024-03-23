@@ -1,20 +1,45 @@
 mod glfw_egui;
+mod logger;
 mod plot;
+mod ui_controller;
 
-mod app;
-pub mod ui_helpers;
-use app::RtAudioEffect;
 mod audio;
+mod audio_analyzer;
+mod audio_processor;
+use audio_processor::AudioProcessor;
+use log::debug;
+use ui_controller::Resolution;
+
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
+
+use crate::ui_controller::UiController;
 
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
-const DEFAULT_RESOLUTION: (u32, u32) = (SCREEN_WIDTH, SCREEN_HEIGHT);
+const DEFAULT_RESOLUTION: Resolution = (SCREEN_WIDTH, SCREEN_HEIGHT);
 
 fn main() {
-    println!("Hello, world!");
+    println!("Hello RtAudioEffect!");
 
-    let mut app_context = RtAudioEffect::new(DEFAULT_RESOLUTION);
-    app_context.run();
+    if let Err(err) =
+        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Trace))
+    {
+        eprintln!("log::set_logger failed: {err:#?}");
+    }
 
-    println!("Goodbye, world!");
+    let audio_processor = Arc::new(Mutex::new(AudioProcessor::new()));
+    let mut ui_controller = UiController::new(audio_processor.clone(), DEFAULT_RESOLUTION);
+
+    audio_processor.lock().unwrap().start();
+
+    while !ui_controller.is_closing() {
+        audio_processor.lock().unwrap().update();
+        ui_controller.render();
+    }
+    audio_processor.lock().unwrap().stop();
+
+    println!("Goodbye RtAudioEffect!");
 }

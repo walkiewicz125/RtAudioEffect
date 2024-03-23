@@ -1,0 +1,64 @@
+class AudioDevice {
+
+}
+
+class StreamParameters{
+
+}
+
+class AudioBuffer{
+
+}
+
+interface AudioStreamConsumer{
+
+}
+
+class StreamConsumerHandle{
+
+}
+
+StreamConsumerHandle *-- AudioBuffer
+StreamConsumerHandle o-- AudioStreamConsumer
+
+AudioDevice *-- cpal_Device
+AudioDevice *-- cpal_Stream
+AudioDevice o-- StreamParameters
+AudioDevice *-- StreamConsumerHandle
+
+AudioManager ..> AudioDevice
+
+class AnalyzerParameters{
+
+}
+
+class StreamAnalyzer{
+
+}
+
+class SpectrumAnalyzer{
+
+}
+
+class Spectrogram{
+
+}
+
+SpectrumAnalyzer *-- rustfft_Fft
+
+StreamAnalyzer *-- AnalyzerParameters
+StreamAnalyzer *-- SpectrumAnalyzer
+StreamAnalyzer *-- Spectrogram
+StreamAnalyzer o-- StreamParameters
+
+Spectrogram o-- AnalyzerParameters
+Spectrogram o-- StreamParameters
+
+
+class AudioProcessor{
+
+}
+
+AudioProcessor ..> AudioManager
+AudioProcessor *-- AudioDevice
+AudioProcessor *-- StreamAnalyzer
