@@ -217,7 +217,8 @@ impl UiSpectrumRenderer {
 pub struct UiController {
     window: UiWindow,
     audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
-    spectrum_texture_renderer: UiSpectrumRenderer,
+    spectrum_texture_renderer_left: UiSpectrumRenderer,
+    spectrum_texture_renderer_right: UiSpectrumRenderer,
 }
 
 impl UiController {
@@ -226,12 +227,14 @@ impl UiController {
         resolution: Resolution,
     ) -> UiController {
         let mut window = UiWindow::new(resolution);
-        let spectrum_texture_renderer = UiSpectrumRenderer::new(&mut window);
+        let spectrum_texture_renderer_left = UiSpectrumRenderer::new(&mut window);
+        let spectrum_texture_renderer_right = UiSpectrumRenderer::new(&mut window);
 
         UiController {
             window,
             audio_analyzis_provider,
-            spectrum_texture_renderer,
+            spectrum_texture_renderer_left,
+            spectrum_texture_renderer_right,
         }
     }
 
@@ -293,14 +296,19 @@ impl UiController {
 
                 // Render spectrum
                 ui.add(Separator::default().vertical());
-                self.spectrum_texture_renderer.render(ui);
+                ui.columns(2, |uis| {
+                    self.spectrum_texture_renderer_left.render(&mut uis[0]);
+                    self.spectrum_texture_renderer_right.render(&mut uis[1]);
+                });
             })
         });
     }
 
     pub fn render(&mut self) {
         if !self.window.should_close() {
-            self.spectrum_texture_renderer
+            self.spectrum_texture_renderer_left
+                .update_spectrum(self.audio_analyzis_provider.clone(), 0);
+            self.spectrum_texture_renderer_right
                 .update_spectrum(self.audio_analyzis_provider.clone(), 1);
 
             self.window.begin_frame();
