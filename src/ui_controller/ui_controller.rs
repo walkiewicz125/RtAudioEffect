@@ -4,8 +4,8 @@ use std::{
 };
 
 use egui::{
-    load::SizedTexture, Align, CollapsingHeader, FontId, Image, InnerResponse, Layout, Separator,
-    TextStyle, TextureId, Ui, Vec2,
+    load::SizedTexture, pos2, vec2, Align, CollapsingHeader, FontId, Image, InnerResponse, Layout,
+    Rect, Separator, TextStyle, TextureId, Ui, Vec2,
 };
 use glfw::{Context, Glfw, WindowEvent};
 
@@ -15,7 +15,7 @@ use crate::{
     plot::{BarSpectrumRenderer, TextureRenderTarget},
 };
 
-use super::{egui_helpers, helpers};
+use super::{add_rows, egui_helpers, helpers};
 
 pub type Resolution = (u32, u32);
 
@@ -171,6 +171,7 @@ impl UiSpectrumRenderer {
         self.spectrum_texture_renderer.set_resolution(resolution);
         self.spectrum_texture_renderer
             .render(&self.spectrum_renderer);
+
         ui.add(Image::from_texture(SizedTexture {
             id: self.spectrum_tex_id,
             size: ui.available_size(),
@@ -305,9 +306,9 @@ impl UiController {
         };
 
         let mut draw_spectrum = |ui: &mut Ui| {
-            ui.columns(2, |uis| {
+            add_rows(ui, 2, |uis| {
                 self.spectrum_texture_renderer_left.render(&mut uis[0]);
-                self.spectrum_texture_renderer_right.render(&mut uis[1]);
+                self.spectrum_texture_renderer_left.render(&mut uis[1]);
             });
         };
 

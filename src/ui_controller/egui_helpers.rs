@@ -1,4 +1,4 @@
-use egui::{FontId, Pos2, Rect, TextStyle, Vec2, WidgetText};
+use egui::{vec2, Align, Layout, Pos2, Rect, Ui, Vec2, WidgetText};
 
 use crate::glfw_egui::{egui_glfw, glfw_painter};
 
@@ -55,4 +55,28 @@ pub fn initialize_egui(
     });
 
     (painter, egui_ctx, egui_input_state)
+}
+
+pub fn add_rows(ui: &mut Ui, num_of_rows: i32, add_contents: impl FnOnce(&mut [Ui])) {
+    ui.scope(|ui| {
+        let spacing = ui.spacing().item_spacing.y;
+        let total_spacing = spacing * (num_of_rows as f32 - 1.0);
+        let row_height = (ui.available_height() - total_spacing) / (num_of_rows as f32);
+        let top_left = ui.max_rect().left_top();
+        let top_right = ui.max_rect().right_top();
+
+        let mut rows: Vec<Ui> = (0..num_of_rows)
+            .map(|row_idx| {
+                let pos = top_left + vec2(0.0, (row_idx as f32) * (row_height + spacing));
+                let child_rect =
+                    Rect::from_two_pos(pos, top_right + vec2(0.0, row_height + spacing));
+
+                let mut row_ui = ui.child_ui(child_rect, Layout::left_to_right(Align::Center));
+                row_ui.set_height(row_height);
+                row_ui
+            })
+            .collect();
+
+        add_contents(&mut rows);
+    });
 }
