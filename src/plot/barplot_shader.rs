@@ -9,7 +9,6 @@ pub struct BarplotShader {
     vertex_array_id: u32,
     projection_id: u32,
     client_size_id: u32,
-    style_id: u32,
 
     // application internal
     vertices_count: i32,
@@ -29,13 +28,11 @@ impl BarplotShader {
         let mut vertex_array_id = 0;
         let mut projection_id = 0;
         let mut client_size_id = 0;
-        let mut style_id = 0;
 
         unsafe {
             gl::GenVertexArrays(1, &mut vertex_array_id);
             gl::GenBuffers(1, &mut projection_id);
             gl::GenBuffers(1, &mut client_size_id);
-            gl::GenBuffers(1, &mut style_id);
         }
 
         Some(BarplotShader {
@@ -43,7 +40,6 @@ impl BarplotShader {
             vertex_array_id,
             projection_id,
             client_size_id,
-            style_id,
             vertices_count: 6,
         })
     }
@@ -75,20 +71,6 @@ impl BarplotShader {
                 gl::DYNAMIC_DRAW,
             );
             gl::BindBufferBase(gl::UNIFORM_BUFFER, 1, self.client_size_id);
-        }
-    }
-
-    pub fn set_style(&self, style_number: u32) {
-        let style_ptr = (&style_number) as *const u32;
-        unsafe {
-            gl::BindBuffer(gl::UNIFORM_BUFFER, self.style_id);
-            gl::BufferData(
-                gl::UNIFORM_BUFFER,
-                size_of::<u32>() as isize,
-                style_ptr.cast(),
-                gl::DYNAMIC_DRAW,
-            );
-            gl::BindBufferBase(gl::UNIFORM_BUFFER, 2, self.style_id);
         }
     }
 

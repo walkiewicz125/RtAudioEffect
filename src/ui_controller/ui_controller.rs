@@ -157,14 +157,9 @@ impl UiSpectrumRenderer {
         let spectrum =
             spectrum_provider.lock().unwrap().get_latest_spectrum()[channel_number].clone();
         self.spectrum_renderer.set_spectrum(spectrum.as_slice());
-        self.spectrum_renderer.set_style(0)
     }
 
     fn render(&mut self, ui: &mut Ui) {
-        unsafe {
-            gl::ClearColor(0.455, 0.302, 0.663, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
         let convert_vec2_to_tuple = |resolution: Vec2| (resolution.x as u32, resolution.y as u32);
         let resolution = convert_vec2_to_tuple(ui.available_size());
         self.spectrum_renderer.set_view(resolution);

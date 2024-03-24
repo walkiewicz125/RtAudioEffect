@@ -14,7 +14,6 @@ pub struct BarSpectrumRenderer {
 impl BarSpectrumRenderer {
     pub fn new() -> BarSpectrumRenderer {
         let shader = BarplotShader::new().expect(&format!("Failed to create BarplotShader",));
-        shader.set_style(0);
 
         let storage = StorageBuffer::new();
         BarSpectrumRenderer {
@@ -64,10 +63,6 @@ impl BarSpectrumRenderer {
 
     pub fn set_spectrum(&mut self, spectrum_data: &[f32]) {
         self.storage.store_array(spectrum_data);
-    }
-
-    pub fn set_style(&self, style_number: u32) {
-        self.shader.set_style(style_number);
     }
 }
 

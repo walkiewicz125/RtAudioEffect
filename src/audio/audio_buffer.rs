@@ -56,12 +56,12 @@ impl AudioBuffer {
         trace!("Getting {total_sample_count} for all channels, with new samples: {new_samples}");
 
         assert!(
-            new_samples < total_sample_count,
+            new_samples <= total_sample_count,
             "Total_sample_count have to be greater than new_samples"
         );
 
         assert!(
-            total_sample_count < self.buffer_duration_in_samples,
+            total_sample_count <= self.buffer_duration_in_samples,
             "Total_sample_count have to be lesser than buffer_duration_in_samples"
         );
 
