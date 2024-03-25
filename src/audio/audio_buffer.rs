@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::{debug, warn};
+use log::{warn, trace};
 
 use super::StreamParameters;
 
@@ -53,7 +53,7 @@ impl AudioBuffer {
         new_samples: usize,
         total_sample_count: usize,
     ) -> Result<ManyChannelsSamples, String> {
-        debug!("Getting {total_sample_count} for all channels, with new samples: {new_samples}");
+        trace!("Getting {total_sample_count} for all channels, with new samples: {new_samples}");
 
         assert!(
             new_samples < total_sample_count,
@@ -91,7 +91,7 @@ impl AudioBuffer {
             if buffer.len() > self.buffer_duration_in_samples {
                 let oversize = buffer.len() - self.buffer_duration_in_samples;
                 buffer.drain(0..oversize);
-                debug!("Trimming buffer[{channel}] by {oversize}");
+                trace!("Trimming buffer[{channel}] by {oversize}");
             }
             assert!(
                 buffer.len() <= self.buffer_duration_in_samples,
@@ -102,7 +102,7 @@ impl AudioBuffer {
 
     fn distribute_into_channels(&mut self, data: MixedChannelsSamples) -> usize {
         let new_samples_per_channel = data.len() / self.channels as usize;
-        debug!(
+        trace!(
             "Distributing samples into separate channels. Channel count {}, new sample count per channel {}",
             self.channels,
             new_samples_per_channel

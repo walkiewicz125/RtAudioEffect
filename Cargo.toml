@@ -15,6 +15,7 @@ glam = "0.24.2"
 glfw = "0.52"
 egui = "0.24"
 log = "0.4.*"
+colored = "2.1.*"
 
 [dependencies.clipboard]
 package = "cli-clipboard"

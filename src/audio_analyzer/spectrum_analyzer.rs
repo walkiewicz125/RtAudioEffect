@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::debug;
+use log::{trace};
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
 
 use crate::audio::OneChannelSamples;
@@ -40,7 +40,7 @@ impl SpectrumAnalyzer {
     }
 
     pub fn analyze(&mut self, new_samples: &OneChannelSamples) -> Spectrum {
-        debug!(
+        trace!(
             "Calculating FFT of new samples. Sample count {}",
             new_samples.len()
         );
@@ -60,7 +60,7 @@ impl SpectrumAnalyzer {
             .collect();
 
         let mean_magnitude: f32 = spectrum.iter().map(|&bar| bar.abs()).sum();
-        debug!("Mean FFT magnitude: {mean_magnitude}");
+        trace!("Mean FFT magnitude: {mean_magnitude}");
 
         spectrum
     }

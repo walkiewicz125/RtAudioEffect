@@ -10,7 +10,7 @@ use cpal::{
     traits::{DeviceTrait, StreamTrait},
     Device, InputCallbackInfo, Stream,
 };
-use log::{debug, error, info};
+use log::{error, info, trace};
 
 use super::{AudioBuffer, AudioStreamConsumer, MixedChannelsSamples, StreamParameters};
 
@@ -53,7 +53,7 @@ impl AudioDevice {
         let Ok(stream) = device.build_input_stream(
             &config.into(),
             move |data, _info: &InputCallbackInfo| {
-                debug!(target:"cpal::Stream", "Sending new data with len: {}", data.len());
+                trace!(target:"cpal::Stream", "Sending new data with len: {}", data.len());
                 data_sender.send(data.to_vec()).unwrap();
             },
             move |err| error!("A error occured on stream: {err:?}"),
@@ -106,16 +106,18 @@ impl AudioDevice {
             stream_consumer,
             consumer_name: consumer_name.unwrap_or(String::from("unnamed")),
         };
+
+        info!("Adding new stream consumer: {}", handler.consumer_name);
         self.consumers_handlers.push(handler);
     }
 
     pub fn update(&mut self) {
         while let Ok(new_data) = self.data_receiver.recv_timeout(Duration::from_secs(0)) {
-            debug!("");
-            debug!("Receiving new data with len: {}", new_data.len());
+            trace!("");
+            trace!("Receiving new data with len: {}", new_data.len());
 
             for handler in &self.consumers_handlers {
-                debug!(
+                trace!(
                     "Calling processing in consumer \"{}\"",
                     handler.consumer_name
                 );
