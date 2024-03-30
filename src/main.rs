@@ -7,10 +7,13 @@ mod audio;
 mod audio_analyzer;
 mod audio_processor;
 use audio_processor::AudioProcessor;
-use log::{info};
+use log::info;
 use ui_controller::Resolution;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crate::ui_controller::UiController;
 
@@ -31,8 +34,18 @@ fn main() {
     let mut ui_controller = UiController::new(audio_processor.clone(), DEFAULT_RESOLUTION);
 
     audio_processor.lock().unwrap().start();
+
+    let thread = thread::spawn(|| {
+        while true {
+            audio_processor.lock().unwrap().update();
+        }
+    });
+
+    // split stream control from stream processing
+    // run stream processing in separate thread.
+    // leave stream control here where gui is
+
     while !ui_controller.is_closing() {
-        audio_processor.lock().unwrap().update();
         ui_controller.render();
     }
     audio_processor.lock().unwrap().stop();

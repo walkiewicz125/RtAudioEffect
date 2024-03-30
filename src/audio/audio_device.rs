@@ -3,14 +3,14 @@ use std::{
         mpsc::{self, Receiver},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use cpal::{
     traits::{DeviceTrait, StreamTrait},
     Device, InputCallbackInfo, Stream,
 };
-use log::{error, info, trace};
+use log::{debug, error, info, trace};
 
 use super::{AudioBuffer, AudioStreamConsumer, MixedChannelsSamples, StreamParameters};
 
@@ -26,6 +26,7 @@ pub struct AudioDevice {
     parameters: Arc<StreamParameters>,
     data_receiver: Receiver<MixedChannelsSamples>,
     consumers_handlers: Vec<StreamConsumerHandler>,
+    last_update_time: Instant,
 }
 
 impl AudioDevice {
@@ -69,6 +70,7 @@ impl AudioDevice {
             parameters,
             data_receiver,
             consumers_handlers: vec![],
+            last_update_time: Instant::now(),
         })
     }
 
@@ -112,7 +114,11 @@ impl AudioDevice {
     }
 
     pub fn update(&mut self) {
+        let update_time = Instant::now();
+        let update_period = self.last_update_time.elapsed();
+        let mut data_packets = 0;
         while let Ok(new_data) = self.data_receiver.recv_timeout(Duration::from_secs(0)) {
+            data_packets += 1;
             trace!("");
             trace!("Receiving new data with len: {}", new_data.len());
 
@@ -128,6 +134,17 @@ impl AudioDevice {
                     .unwrap()
                     .process_new_samples(handler.audio_buffer.clone());
             }
+        }
+
+        if data_packets > 0 {
+            let processing_time = update_time.elapsed();
+            self.last_update_time = update_time;
+
+            debug!(
+                "Update thread. Processing time: {}, Data packets {}",
+                processing_time.as_secs_f32() / update_period.as_secs_f32(),
+                data_packets
+            );
         }
     }
 

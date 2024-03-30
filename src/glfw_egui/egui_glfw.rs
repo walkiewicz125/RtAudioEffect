@@ -119,6 +119,7 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
                     pressed: false,
                     repeat: false,
                     modifiers: state.modifiers,
+                    physical_key: None,
                 });
             }
         }
@@ -156,6 +157,7 @@ pub fn handle_event(event: glfw::WindowEvent, state: &mut EguiInputState) {
                         pressed: true,
                         repeat: false,
                         modifiers: state.modifiers,
+                        physical_key: None,
                     });
                 }
             }
