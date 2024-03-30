@@ -1,44 +1,46 @@
-@startuml "UiController thread"
-Participant AudioProcessor as AudioProcessor
-Participant Main as Main
-Participant UiController as UiController
-Participant UiWindow as UiWindow
+' @startuml "UiController thread"
 
 
-Main -> AudioProcessor : audio_processor:AudioAnalyzysProvider = new()
-Main <-- AudioProcessor
+' Participant AudioProcessor as AudioProcessor
+' Participant Main as Main
+' Participant UiController as UiController
+' Participant UiWindow as UiWindow
 
-Main -> UiController : ui_controller = new(&audio_processor)
-Main <-- UiController
 
-Main -> AudioProcessor : start()
-Main <-- AudioProcessor
+' Main -> AudioProcessor : audio_processor:AudioAnalyzysProvider = new()
+' Main <-- AudioProcessor
 
-loop until ui_controller.is_closing()
-    Main -> UiController : update()
+' Main -> UiController : ui_controller = new(&audio_processor)
+' Main <-- UiController
 
-    UiController -> UiWindow : begin_frame()
-    UiController <-- UiWindow
+' Main -> AudioProcessor : start()
+' Main <-- AudioProcessor
 
-    UiController -> UiWindow : top_panel()
-    UiController <- UiWindow : add_contets
-    UiController --> UiWindow
-    UiController <-- UiWindow : return top_panel()
+' loop until ui_controller.is_closing()
+'     Main -> UiController : update()
 
-    UiController -> UiWindow : central_panel()
-    UiController <- UiWindow : add_contets
-    UiController -> UiController : show_stream_parameters(&audio_analyzis_provider)
-    UiController -> UiController : show_spectrum_parameters(&audio_analyzis_provider)
-    UiController --> UiWindow
-    UiController <-- UiWindow : return central_panel()
+'     UiController -> UiWindow : begin_frame()
+'     UiController <-- UiWindow
 
-    UiController -> UiWindow : finalize_frame()
-    UiController <-- UiWindow
+'     UiController -> UiWindow : top_panel()
+'     UiController <- UiWindow : add_contets
+'     UiController --> UiWindow
+'     UiController <-- UiWindow : return top_panel()
 
-    Main <-- UiController
-end
+'     UiController -> UiWindow : central_panel()
+'     UiController <- UiWindow : add_contets
+'     UiController -> UiController : show_stream_parameters(&audio_analyzis_provider)
+'     UiController -> UiController : show_spectrum_parameters(&audio_analyzis_provider)
+'     UiController --> UiWindow
+'     UiController <-- UiWindow : return central_panel()
 
-Main -> AudioProcessor : stop()
-Main <-- AudioProcessor
+'     UiController -> UiWindow : finalize_frame()
+'     UiController <-- UiWindow
 
-@enduml
+'     Main <-- UiController
+' end
+
+' Main -> AudioProcessor : stop()
+' Main <-- AudioProcessor
+
+' @enduml

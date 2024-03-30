@@ -1,19 +1,34 @@
 @startuml "processing new samples"
+autoactivate on
 
-AudioDevice -> StreamAnalyzer : process_new_samples(audio_buffer)
+actor Main
+control ProcessingThread as Thread
 
-StreamAnalyzer -> AudioBuffer : read_new_samples(refresh_time_in_samples, spectrum_width)
-StreamAnalyzer <-- AudioBuffer : new_samples: MixedChannelsSamples
+Main -> Thread : spawn()
+loop until : is_alive()
+    Thread -> StreamAnalyzer : is_alive()
+    alt true:
+        Thread <-- StreamAnalyzer : return true
+        Thread -> StreamAnalyzer : process_new_samples()
+        StreamAnalyzer -> AudioBuffer : read_new_samples(refresh_time_in_samples, spectrum_width)
+        StreamAnalyzer <-- AudioBuffer : new_samples: MixedChannelsSamples
 
-loop foreach channel in new_samples
-StreamAnalyzer -> SpectrumAnalyzer : analyze(OneChannelSamples)
-StreamAnalyzer <- SpectrumAnalyzer : return Spectrum
-StreamAnalyzer -> StreamAnalyzer : add channel spectrum to spectrums:ManyChannelsSpectrums
+        loop foreach channel in new_samples
+        StreamAnalyzer -> SpectrumAnalyzer : analyze(OneChannelSamples)
+        StreamAnalyzer <-- SpectrumAnalyzer : return Spectrum
+        StreamAnalyzer -> StreamAnalyzer : add channel spectrum to spectrums:ManyChannelsSpectrums
+        end
+
+        StreamAnalyzer -> Spectrogram : push(spectrums)
+        StreamAnalyzer <-- Spectrogram
+
+        Thread <-- StreamAnalyzer
+    else false
+        Thread <-- StreamAnalyzer : return false
+        Main <-- Thread : join()
+    end
 end
 
-StreamAnalyzer -> Spectrogram : push(spectrums)
-StreamAnalyzer <- Spectrogram
 
-AudioDevice <-- StreamAnalyzer
 
 @enduml

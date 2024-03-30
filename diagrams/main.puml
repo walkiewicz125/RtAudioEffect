@@ -1,0 +1,43 @@
+@startuml "run of processing"
+autoactivate on
+
+actor User
+control Main
+participant AudioManager
+participant AudioStream
+participant AudioStreamSender
+participant StreamAnalyzer
+participant AudioBuffer
+control cpal_Stream
+
+User -> Main : start()
+
+Main -> AudioManager:  get_default_loopback_device()
+Main <-- AudioManager : return device
+Main -> AudioStream : new(device)
+    AudioStream -> AudioStreamSender : new()
+    AudioStream <-- AudioStreamSender : return sender
+    AudioStream -> cpal_Stream ** : spawn()
+Main <-- AudioStream : return stream
+
+alt add stream analyzer
+Main -> StreamAnalyzer : new(..., stream)
+Main <-- StreamAnalyzer : return analyzer
+Main -> AudioStream : add_stream_consumer(analyzer)
+    AudioStream -> AudioStreamSender : add_stream_receiver(analyzer)
+        AudioStreamSender-> StreamAnalyzer : get_audio_bffer()
+        AudioStreamSender <-- StreamAnalyzer
+    AudioStream <-- AudioStreamSender
+Main <-- AudioStream
+end
+
+loop
+    cpal_Stream -> AudioStreamSender : send_data(new_samples)
+    loop for  each receiver in data_stream_receivers
+        AudioStreamSender -> AudioBuffer : store(new_samples)
+        AudioStreamSender <-- AudioBuffer
+    end
+    cpal_Stream <-- AudioStreamSender
+end
+
+@enduml
