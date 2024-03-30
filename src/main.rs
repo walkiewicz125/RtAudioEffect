@@ -6,16 +6,16 @@ mod ui_controller;
 mod audio;
 mod audio_analyzer;
 mod audio_processor;
-use audio_processor::AudioProcessor;
-use log::info;
+use log::{debug, info};
 use ui_controller::Resolution;
 
 use std::{
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 
-use crate::ui_controller::UiController;
+use crate::{audio_processor::AudioStream, ui_controller::UiController};
 
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
@@ -30,15 +30,15 @@ fn main() {
         eprintln!("log::set_logger failed: {err:#?}");
     }
 
-    let audio_processor = Arc::new(Mutex::new(AudioProcessor::new()));
-    let mut ui_controller = UiController::new(audio_processor.clone(), DEFAULT_RESOLUTION);
+    let audio_processor = Arc::new(Mutex::new(AudioStream::new()));
+    let mut ui_controller: UiController =
+        UiController::new(audio_processor.clone(), DEFAULT_RESOLUTION);
 
     audio_processor.lock().unwrap().start();
-
-    let thread = thread::spawn(|| {
-        while true {
-            audio_processor.lock().unwrap().update();
-        }
+    let receiver: Arc<Mutex<audio::AudioStreamReceiver>> =
+        audio_processor.lock().unwrap().stream_receiver.clone();
+    let _thread = thread::spawn(move || loop {
+        receiver.lock().unwrap().update();
     });
 
     // split stream control from stream processing

@@ -1,16 +1,10 @@
 use std::{
-    sync::{
-        mpsc::{self, Receiver},
-        Arc, Mutex,
-    },
+    sync::{mpsc::Receiver, Arc, Mutex},
     time::{Duration, Instant},
 };
 
-use cpal::{
-    traits::{DeviceTrait, StreamTrait},
-    Device, InputCallbackInfo, Stream,
-};
-use log::{debug, error, info, trace};
+use cpal::Device;
+use log::{debug, info, trace};
 
 use super::{AudioBuffer, AudioStreamConsumer, MixedChannelsSamples, StreamParameters};
 
@@ -20,74 +14,24 @@ struct StreamConsumerHandler {
     consumer_name: String,
 }
 
-pub struct AudioDevice {
-    _device: Device,
-    stream: Stream,
+pub struct AudioStreamReceiver {
     parameters: Arc<StreamParameters>,
     data_receiver: Receiver<MixedChannelsSamples>,
-    consumers_handlers: Vec<StreamConsumerHandler>,
+    consumers_handlers: Arc<Mutex<Vec<StreamConsumerHandler>>>,
     last_update_time: Instant,
 }
 
-impl AudioDevice {
-    pub fn new(device: Device) -> Result<AudioDevice, &'static str> {
-        let Ok(config) = device.default_output_config() else {
-            return Err("Failed to get default config");
-        };
-
-        let sample_rate = config.sample_rate().0;
-        let channels = config.channels();
-        info!("Sample rate: {sample_rate}, channels: {channels}");
-
-        let cpal::SampleFormat::F32 = config.sample_format() else {
-            error!("Unsupported format");
-            panic!("Unsupported format");
-        };
-
-        let parameters = Arc::new(StreamParameters {
-            sample_rate,
-            channels,
-        });
-
-        let (data_sender, data_receiver) = mpsc::channel::<MixedChannelsSamples>();
-
-        let Ok(stream) = device.build_input_stream(
-            &config.into(),
-            move |data, _info: &InputCallbackInfo| {
-                trace!(target:"cpal::Stream", "Sending new data with len: {}", data.len());
-                data_sender.send(data.to_vec()).unwrap();
-            },
-            move |err| error!("A error occured on stream: {err:?}"),
-            None,
-        ) else {
-            error!("Failed to build in/out stream");
-            panic!("Failed to build in/out stream");
-        };
-
-        Ok(AudioDevice {
-            _device: device,
-            stream,
+impl AudioStreamReceiver {
+    pub fn new(
+        parameters: Arc<StreamParameters>,
+        data_channel_rx: Receiver<Vec<f32>>,
+    ) -> Result<AudioStreamReceiver, &'static str> {
+        Ok(AudioStreamReceiver {
             parameters,
-            data_receiver,
-            consumers_handlers: vec![],
+            data_receiver: data_channel_rx,
+            consumers_handlers: Arc::new(Mutex::new(vec![])),
             last_update_time: Instant::now(),
         })
-    }
-
-    pub fn start(&self) {
-        info!("Starting stream");
-
-        if let Err(err) = self.stream.play() {
-            error!("Error occured during start(): {err:#?}");
-        }
-    }
-
-    pub fn stop(&self) {
-        info!("Stopping stream");
-
-        if let Err(err) = self.stream.pause() {
-            error!("Error occured during stop(): {err:#?}");
-        }
     }
 
     pub fn add_stream_consumer(
@@ -110,7 +54,7 @@ impl AudioDevice {
         };
 
         info!("Adding new stream consumer: {}", handler.consumer_name);
-        self.consumers_handlers.push(handler);
+        self.consumers_handlers.lock().unwrap().push(handler);
     }
 
     pub fn update(&mut self) {
@@ -122,7 +66,7 @@ impl AudioDevice {
             trace!("");
             trace!("Receiving new data with len: {}", new_data.len());
 
-            for handler in &self.consumers_handlers {
+            for handler in self.consumers_handlers.lock().unwrap().iter() {
                 trace!(
                     "Calling processing in consumer \"{}\"",
                     handler.consumer_name

@@ -1,10 +1,13 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{mpsc, Arc, Mutex},
     time::Duration,
 };
 
 use crate::{
-    audio::{AudioDevice, AudioManager, StreamParameters},
+    audio::{
+        audio_stream_source::AudioStreamSource, AudioManager, AudioStreamReceiver,
+        MixedChannelsSamples, StreamParameters,
+    },
     audio_analyzer::{AnalyzerParameters, ManyChannelsSpectrums, StreamAnalyzer},
 };
 
@@ -14,47 +17,51 @@ pub trait AudioAnalyzysProvider {
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
 }
 
-pub struct AudioProcessor {
-    audio_device: AudioDevice,
+pub struct AudioStream {
+    stream_source: AudioStreamSource,
+    pub stream_receiver: Arc<Mutex<AudioStreamReceiver>>,
     analyzer: Arc<Mutex<StreamAnalyzer>>,
 }
 
-impl AudioProcessor {
+impl AudioStream {
     pub fn new() -> Self {
-        let mut audio_device =
-            AudioDevice::new(AudioManager::get_default_loopback().unwrap()).unwrap();
-        let audio_device_parameters = audio_device.get_parameters();
+        let (channel_tx, channel_rx) = mpsc::channel::<MixedChannelsSamples>();
+
+        let mut stream_source =
+            AudioStreamSource::new(AudioManager::get_default_loopback().unwrap(), channel_tx)
+                .unwrap();
+        let parameters = stream_source.get_parameters();
+        let mut stream_receiver = AudioStreamReceiver::new(parameters.clone(), channel_rx).unwrap();
+
         let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
             Duration::from_secs_f32(0.01),
             Duration::from_secs_f32(1.0),
             4800,
-            audio_device_parameters,
+            parameters,
         )));
 
-        audio_device.add_stream_consumer(analyzer.clone(), Some(String::from("Spectrum Analyzer")));
+        stream_receiver
+            .add_stream_consumer(analyzer.clone(), Some(String::from("Spectrum Analyzer")));
 
-        AudioProcessor {
-            audio_device,
+        AudioStream {
+            stream_source,
+            stream_receiver: Arc::new(Mutex::new(stream_receiver)),
             analyzer,
         }
     }
 
     pub fn start(&mut self) {
-        self.audio_device.start();
-    }
-
-    pub fn update(&mut self) {
-        self.audio_device.update();
+        self.stream_source.start();
     }
 
     pub fn stop(&mut self) {
-        self.audio_device.stop();
+        self.stream_source.stop();
     }
 }
 
-impl AudioAnalyzysProvider for AudioProcessor {
+impl AudioAnalyzysProvider for AudioStream {
     fn get_stream_parameters(&self) -> Arc<StreamParameters> {
-        self.audio_device.get_parameters().clone()
+        self.stream_source.get_parameters().clone()
     }
 
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
@@ -66,7 +73,7 @@ impl AudioAnalyzysProvider for AudioProcessor {
     }
 }
 
-impl Default for AudioProcessor {
+impl Default for AudioStream {
     fn default() -> Self {
         Self::new()
     }
