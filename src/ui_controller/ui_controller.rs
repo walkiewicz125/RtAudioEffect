@@ -4,13 +4,14 @@ use std::{
 };
 
 use egui::{
-    load::SizedTexture, pos2, vec2, Align, CollapsingHeader, FontId, Image, InnerResponse, Layout,
-    Rect, Separator, TextStyle, TextureId, Ui, Vec2,
+    load::SizedTexture, Align, CollapsingHeader, FontId, Image, InnerResponse, Layout, Separator,
+    TextStyle, TextureId, Ui, Vec2,
 };
 use glfw::{Context, Glfw, WindowEvent};
 
 use crate::{
-    audio_processor::AudioAnalyzysProvider,
+    audio::audio_stream::AudioStream,
+    audio_analyzer::AudioAnalyzysProvider,
     glfw_egui::{egui_glfw, glfw_painter},
     plot::{BarSpectrumRenderer, TextureRenderTarget},
 };
@@ -177,6 +178,7 @@ impl UiSpectrumRenderer {
 pub struct UiController {
     window: UiWindow,
     audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+    audio_stream: Arc<Mutex<AudioStream>>,
     spectrum_texture_renderer_left: UiSpectrumRenderer,
     spectrum_texture_renderer_right: UiSpectrumRenderer,
 }
@@ -184,6 +186,7 @@ pub struct UiController {
 impl UiController {
     pub fn new(
         audio_analyzis_provider: Arc<Mutex<dyn AudioAnalyzysProvider>>,
+        audio_stream: Arc<Mutex<AudioStream>>,
         resolution: Resolution,
     ) -> UiController {
         let mut window = UiWindow::new(resolution);
@@ -193,6 +196,7 @@ impl UiController {
         UiController {
             window,
             audio_analyzis_provider,
+            audio_stream,
             spectrum_texture_renderer_left,
             spectrum_texture_renderer_right,
         }
@@ -218,11 +222,7 @@ impl UiController {
             .lock()
             .unwrap()
             .get_analyzer_parameters();
-        let stream_parameters = self
-            .audio_analyzis_provider
-            .lock()
-            .unwrap()
-            .get_stream_parameters();
+        let stream_parameters = self.audio_stream.lock().unwrap().get_parameters();
 
         let draw_stream_parameters = |ui: &mut Ui| {
             CollapsingHeader::new("Stream parameters")

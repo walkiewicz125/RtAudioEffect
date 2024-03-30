@@ -6,7 +6,7 @@ mod ui_controller;
 mod audio;
 mod audio_analyzer;
 mod audio_processor;
-use log::{debug, info};
+use log::info;
 use ui_controller::Resolution;
 
 use std::{
@@ -15,7 +15,10 @@ use std::{
     time::Duration,
 };
 
-use crate::{audio_processor::AudioStream, ui_controller::UiController};
+use crate::audio::{
+    audio_stream::AudioStream, audio_stream_consumer::AudioStreamConsumer, AudioManager,
+};
+use crate::{audio_analyzer::StreamAnalyzer, ui_controller::UiController};
 
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
@@ -30,25 +33,41 @@ fn main() {
         eprintln!("log::set_logger failed: {err:#?}");
     }
 
-    let audio_processor = Arc::new(Mutex::new(AudioStream::new()));
+    let audio_stream = Arc::new(Mutex::new(
+        AudioStream::new(AudioManager::get_default_loopback().unwrap()).unwrap(),
+    ));
+
+    let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
+        Duration::from_secs_f32(0.01),
+        Duration::from_secs_f32(1.0),
+        4800,
+        audio_stream.lock().unwrap().get_parameters(),
+    )));
+
+    audio_stream
+        .lock()
+        .unwrap()
+        .add_stream_consumer(analyzer.clone());
+
     let mut ui_controller: UiController =
-        UiController::new(audio_processor.clone(), DEFAULT_RESOLUTION);
+        UiController::new(analyzer.clone(), audio_stream.clone(), DEFAULT_RESOLUTION);
 
-    audio_processor.lock().unwrap().start();
-    let receiver: Arc<Mutex<audio::AudioStreamReceiver>> =
-        audio_processor.lock().unwrap().stream_receiver.clone();
-    let _thread = thread::spawn(move || loop {
-        receiver.lock().unwrap().update();
+    audio_stream.lock().unwrap().start();
+
+    let analyzer_clone = analyzer.clone();
+    let analyzer_thread = thread::spawn(move || {
+        while analyzer_clone.lock().unwrap().is_alive() {
+            analyzer_clone.lock().unwrap().process_new_samples();
+        }
     });
-
-    // split stream control from stream processing
-    // run stream processing in separate thread.
-    // leave stream control here where gui is
 
     while !ui_controller.is_closing() {
         ui_controller.render();
     }
-    audio_processor.lock().unwrap().stop();
+
+    audio_stream.lock().unwrap().stop();
+    analyzer.lock().unwrap().kill();
+    analyzer_thread.join().unwrap();
 
     info!("Goodbye RtAudioEffect!");
 }

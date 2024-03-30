@@ -3,33 +3,43 @@ use std::{
     time::Duration,
 };
 
-use log::{trace};
+use log::trace;
 
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
 use super::{AnalyzerParameters, ManyChannelsSpectrums, Spectrogram, SpectrumAnalyzer};
 
 pub struct StreamAnalyzer {
+    audio_buffer: Arc<Mutex<AudioBuffer>>,
     analyzer_parameters: Arc<AnalyzerParameters>,
     spectrum_analyzer: SpectrumAnalyzer,
     spectrogram: Spectrogram,
+    is_alive: bool,
+}
+
+pub trait AudioAnalyzysProvider {
+    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
+    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
 }
 
 impl AudioStreamConsumer for StreamAnalyzer {
-    fn process_new_samples(&mut self, audio_buffer: Arc<Mutex<AudioBuffer>>) {
+    fn process_new_samples(&mut self) {
         trace!("Processing new samples");
-        let mut buffer = audio_buffer.lock().unwrap();
 
         let total_sample_count = self.analyzer_parameters.spectrum_width;
         let new_samples = self.analyzer_parameters.refresh_time_in_samples;
 
-        while buffer.get_new_samples_count() >= new_samples {
-            if let Ok(new_multichannel_samples) =
-                buffer.read_new_samples(new_samples, total_sample_count)
+        while self.audio_buffer.lock().unwrap().get_new_samples_count() >= new_samples {
+            if let Ok(new_multichannel_samples) = self
+                .audio_buffer
+                .lock()
+                .unwrap()
+                .read_new_samples(new_samples, total_sample_count)
             {
                 trace!(
                     "Reading {} samples for all channels, with new samples: {}",
-                    total_sample_count, new_samples
+                    total_sample_count,
+                    new_samples
                 );
                 let mut spectrums = vec![];
                 for (channel, samples) in new_multichannel_samples.iter().enumerate() {
@@ -40,12 +50,26 @@ impl AudioStreamConsumer for StreamAnalyzer {
             }
         }
     }
+
+    fn get_audio_buffer(&self) -> Arc<Mutex<AudioBuffer>> {
+        self.audio_buffer.clone()
+    }
+}
+
+impl AudioAnalyzysProvider for StreamAnalyzer {
+    fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
+        self.get_analyzer_parameters()
+    }
+
+    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
+        self.get_latest_spectrum()
+    }
 }
 
 impl StreamAnalyzer {
     pub fn new(
         refresh_time: Duration,
-        spectrogram_duration: Duration,
+        buffer_duration: Duration,
         spectrum_width: usize,
         stream_parameters: Arc<StreamParameters>,
     ) -> StreamAnalyzer {
@@ -53,20 +77,25 @@ impl StreamAnalyzer {
             (stream_parameters.sample_rate as f32 * refresh_time.as_secs_f32()) as usize;
 
         let number_of_spectrums_in_history =
-            (spectrogram_duration.as_secs_f32() / refresh_time.as_secs_f32()) as usize;
+            (buffer_duration.as_secs_f32() / refresh_time.as_secs_f32()) as usize;
 
         let parameters = Arc::new(AnalyzerParameters {
             spectrum_width,
             refresh_time_in_samples,
             number_of_spectrums_in_history,
             refresh_time,
-            spectrogram_duration,
+            spectrogram_duration: buffer_duration,
         });
 
         StreamAnalyzer {
+            audio_buffer: Arc::new(Mutex::new(AudioBuffer::new(
+                stream_parameters.clone(),
+                buffer_duration,
+            ))),
             analyzer_parameters: parameters.clone(),
             spectrum_analyzer: SpectrumAnalyzer::new(spectrum_width),
             spectrogram: Spectrogram::new(parameters, stream_parameters.clone()),
+            is_alive: true,
         }
     }
 
@@ -76,5 +105,13 @@ impl StreamAnalyzer {
 
     pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
         self.spectrogram.get_latest_spectrum()
+    }
+
+    pub fn kill(&mut self) {
+        self.is_alive = false;
+    }
+
+    pub fn is_alive(&self) -> bool {
+        self.is_alive
     }
 }

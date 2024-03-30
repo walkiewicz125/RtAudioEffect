@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use log::{warn, trace};
+use log::{trace, warn};
 
 use super::StreamParameters;
 
@@ -17,10 +17,10 @@ pub struct AudioBuffer {
 }
 
 impl AudioBuffer {
-    pub fn new(
-        stream_parameters: Arc<StreamParameters>,
-        buffer_duration_in_samples: usize,
-    ) -> AudioBuffer {
+    pub fn new(stream_parameters: Arc<StreamParameters>, buffer_duration: Duration) -> AudioBuffer {
+        let buffer_duration_in_samples =
+            (stream_parameters.sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
+
         let empty_channels_buffers =
             vec![vec![0.0; buffer_duration_in_samples]; stream_parameters.channels as usize];
         AudioBuffer {

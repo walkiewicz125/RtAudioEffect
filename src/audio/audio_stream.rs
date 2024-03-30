@@ -1,4 +1,4 @@
-use std::sync::{mpsc::Sender, Arc};
+use std::sync::{Arc, Mutex};
 
 use cpal::{
     traits::{DeviceTrait, StreamTrait},
@@ -6,19 +6,41 @@ use cpal::{
 };
 use log::{error, info, trace};
 
-use super::StreamParameters;
+use super::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
-pub struct AudioStreamSource {
+struct AudioStreamSender {
+    data_stream_receivers: Vec<Arc<Mutex<AudioBuffer>>>,
+}
+
+impl AudioStreamSender {
+    pub fn new() -> Self {
+        AudioStreamSender {
+            data_stream_receivers: Vec::new(),
+        }
+    }
+
+    pub fn add_stream_receiver(&mut self, stream_receiver: Arc<Mutex<dyn AudioStreamConsumer>>) {
+        info!("Adding new stream receiver");
+        self.data_stream_receivers
+            .push(stream_receiver.lock().unwrap().get_audio_buffer());
+    }
+
+    pub fn send_data(&mut self, data: Vec<f32>) {
+        for data_stream_receiver in self.data_stream_receivers.iter() {
+            data_stream_receiver.lock().unwrap().store(data.clone());
+        }
+    }
+}
+
+pub struct AudioStream {
     _device: Device,
     stream: Stream,
     parameters: Arc<StreamParameters>,
+    stream_sender: Arc<Mutex<AudioStreamSender>>,
 }
 
-impl AudioStreamSource {
-    pub fn new(
-        device: Device,
-        data_chanel_tx: Sender<Vec<f32>>,
-    ) -> Result<AudioStreamSource, &'static str> {
+impl AudioStream {
+    pub fn new(device: Device) -> Result<AudioStream, &'static str> {
         let Ok(config) = device.default_output_config() else {
             return Err("Failed to get default config");
         };
@@ -37,11 +59,13 @@ impl AudioStreamSource {
             channels,
         });
 
+        let stream_sender = Arc::new(Mutex::new(AudioStreamSender::new()));
+        let stream_sender_copy = stream_sender.clone();
         let Ok(stream) = device.build_input_stream(
             &config.into(),
             move |data, _info: &InputCallbackInfo| {
                 trace!(target:"cpal::Stream", "Sending new data with len: {}", data.len());
-                data_chanel_tx.send(data.to_vec()).unwrap();
+                stream_sender_copy.lock().unwrap().send_data(data.to_vec());
             },
             move |err| error!("A error occured on stream: {err:?}"),
             None,
@@ -50,10 +74,11 @@ impl AudioStreamSource {
             panic!("Failed to build in/out stream");
         };
 
-        Ok(AudioStreamSource {
+        Ok(AudioStream {
             _device: device,
             stream,
             parameters,
+            stream_sender,
         })
     }
 
@@ -75,5 +100,12 @@ impl AudioStreamSource {
 
     pub fn get_parameters(&self) -> Arc<StreamParameters> {
         self.parameters.clone()
+    }
+
+    pub fn add_stream_consumer(&mut self, stream_consumer: Arc<Mutex<dyn AudioStreamConsumer>>) {
+        self.stream_sender
+            .lock()
+            .unwrap()
+            .add_stream_receiver(stream_consumer)
     }
 }
