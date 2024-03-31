@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use log::trace;
+use log::{info, trace};
 
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
@@ -54,6 +54,10 @@ impl AudioStreamConsumer for StreamAnalyzer {
     fn get_audio_buffer(&self) -> Arc<Mutex<AudioBuffer>> {
         self.audio_buffer.clone()
     }
+
+    fn get_name(&self) -> String {
+        String::from("Stream spectrum analyzer")
+    }
 }
 
 impl AudioAnalyzysProvider for StreamAnalyzer {
@@ -73,6 +77,8 @@ impl StreamAnalyzer {
         spectrum_width: usize,
         stream_parameters: Arc<StreamParameters>,
     ) -> StreamAnalyzer {
+        info!("Creating new StreamAnalyzer with: {stream_parameters}");
+
         let refresh_time_in_samples =
             (stream_parameters.sample_rate as f32 * refresh_time.as_secs_f32()) as usize;
 

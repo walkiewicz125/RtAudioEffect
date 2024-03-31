@@ -6,17 +6,18 @@ control ProcessingThread as Thread
 
 Main -> Thread : spawn()
 loop until : is_alive()
-    Thread -> StreamAnalyzer : is_alive()
     alt true:
+        Thread -> StreamAnalyzer : is_alive()
         Thread <-- StreamAnalyzer : return true
         Thread -> StreamAnalyzer : process_new_samples()
         StreamAnalyzer -> AudioBuffer : read_new_samples(refresh_time_in_samples, spectrum_width)
         StreamAnalyzer <-- AudioBuffer : new_samples: MixedChannelsSamples
 
         loop foreach channel in new_samples
-        StreamAnalyzer -> SpectrumAnalyzer : analyze(OneChannelSamples)
-        StreamAnalyzer <-- SpectrumAnalyzer : return Spectrum
-        StreamAnalyzer -> StreamAnalyzer : add channel spectrum to spectrums:ManyChannelsSpectrums
+            StreamAnalyzer -> StreamAnalyzer : for channel samples
+            StreamAnalyzer -> SpectrumAnalyzer : analyze(OneChannelSamples)
+            StreamAnalyzer <-- SpectrumAnalyzer : return Spectrum
+            deactivate StreamAnalyzer
         end
 
         StreamAnalyzer -> Spectrogram : push(spectrums)
@@ -24,8 +25,12 @@ loop until : is_alive()
 
         Thread <-- StreamAnalyzer
     else false
+        Main -> StreamAnalyzer : kill()
+        Main <-- StreamAnalyzer :
+        Thread -> StreamAnalyzer : is_alive()
         Thread <-- StreamAnalyzer : return false
         Main <-- Thread : join()
+        destroy Thread
     end
 end
 

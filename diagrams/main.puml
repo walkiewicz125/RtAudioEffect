@@ -9,35 +9,81 @@ participant AudioStreamSender
 participant StreamAnalyzer
 participant AudioBuffer
 control cpal_Stream
-
 User -> Main : start()
 
-Main -> AudioManager:  get_default_loopback_device()
-Main <-- AudioManager : return device
-Main -> AudioStream : new(device)
-    AudioStream -> AudioStreamSender : new()
-    AudioStream <-- AudioStreamSender : return sender
-    AudioStream -> cpal_Stream ** : spawn()
+group Create new stream
+    Main -> AudioManager:  get_default_loopback_device()
+    Main <-- AudioManager : return device
+    Main -> AudioStream : new(device)
+        AudioStream -> AudioStreamSender : new()
+        AudioStream <-- AudioStreamSender : return sender
+        AudioStream -> cpal_Stream ** : spawn()
 Main <-- AudioStream : return stream
-
-alt add stream analyzer
-Main -> StreamAnalyzer : new(..., stream)
-Main <-- StreamAnalyzer : return analyzer
-Main -> AudioStream : add_stream_consumer(analyzer)
-    AudioStream -> AudioStreamSender : add_stream_receiver(analyzer)
-        AudioStreamSender-> StreamAnalyzer : get_audio_bffer()
-        AudioStreamSender <-- StreamAnalyzer
-    AudioStream <-- AudioStreamSender
-Main <-- AudioStream
 end
 
-loop
-    cpal_Stream -> AudioStreamSender : send_data(new_samples)
-    loop for  each receiver in data_stream_receivers
-        AudioStreamSender -> AudioBuffer : store(new_samples)
-        AudioStreamSender <-- AudioBuffer
+alt add stream consumer
+    group add stream analyzer (spectrum)
+        Main -> StreamAnalyzer : new(..., stream)
+        Main <-- StreamAnalyzer : return analyzer
+        Main -> AudioStream : add_stream_consumer(analyzer)
+            AudioStream -> AudioStreamSender : add_stream_receiver(analyzer)
+                AudioStreamSender-> StreamAnalyzer : get_audio_bffer()
+                AudioStreamSender <-- StreamAnalyzer
+            AudioStream <-- AudioStreamSender
+        Main <-- AudioStream
     end
-    cpal_Stream <-- AudioStreamSender
 end
+
+== Running processing and UI ==
+
+Main -> AudioStream : start()
+    AudioStream -> cpal_Stream : start()
+    AudioStream <-- cpal_Stream
+Main <-- AudioStream
+
+group Running in separate thread. See stream_analyzer.puml
+    loop
+        cpal_Stream -> AudioStreamSender : send_data(new_samples)
+        activate cpal_Stream
+        loop for  each receiver in data_stream_receivers
+            AudioStreamSender -> AudioBuffer : store(new_samples)
+            AudioStreamSender <-- AudioBuffer
+        end
+        cpal_Stream <-- AudioStreamSender
+        deactivate cpal_Stream
+    end
+end
+
+group Running rendering and UI in main thread.
+    loop until : is_alive()
+    Main -> Main : render loop
+        alt true:
+            Main -> UiController : is_alive()
+            activate UiController
+            Main <-- UiController : return true
+            Main -> UiController : render()
+            Main <-- UiController
+            deactivate UiController
+        else false
+            Main -> UiController : is_alive()
+            activate UiController
+            Main <-- UiController : return false
+            Main <-- UiController : join()
+            deactivate UiController
+            destroy UiController
+        end
+    deactivate Main
+    end
+    deactivate UiController
+end
+
+Main -> StreamAnalyzer : kill()
+Main <-- StreamAnalyzer
+destroy StreamAnalyzer
+
+Main -> AudioStream : stop()
+    AudioStream -> cpal_Stream : stop()
+    AudioStream <-- cpal_Stream
+Main <-- AudioStream
 
 @enduml

@@ -20,7 +20,10 @@ impl AudioStreamSender {
     }
 
     pub fn add_stream_receiver(&mut self, stream_receiver: Arc<Mutex<dyn AudioStreamConsumer>>) {
-        info!("Adding new stream receiver");
+        info!(
+            "Adding new stream receiver: {}",
+            stream_receiver.lock().unwrap().get_name()
+        );
         self.data_stream_receivers
             .push(stream_receiver.lock().unwrap().get_audio_buffer());
     }
@@ -47,17 +50,17 @@ impl AudioStream {
 
         let sample_rate = config.sample_rate().0;
         let channels = config.channels();
-        info!("Sample rate: {sample_rate}, channels: {channels}");
+        let parameters = Arc::new(StreamParameters {
+            sample_rate,
+            channels,
+        });
+
+        info!("Creating new audio stream with: {parameters}");
 
         let cpal::SampleFormat::F32 = config.sample_format() else {
             error!("Unsupported format");
             panic!("Unsupported format");
         };
-
-        let parameters = Arc::new(StreamParameters {
-            sample_rate,
-            channels,
-        });
 
         let stream_sender = Arc::new(Mutex::new(AudioStreamSender::new()));
         let stream_sender_copy = stream_sender.clone();
