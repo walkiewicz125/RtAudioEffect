@@ -88,7 +88,7 @@ impl StreamAnalyzer {
         let parameters = Arc::new(AnalyzerParameters {
             spectrum_width,
             refresh_time_in_samples,
-            number_of_spectrums_in_history,
+            length_of_history: number_of_spectrums_in_history,
             refresh_time,
             spectrogram_duration: buffer_duration,
         });
