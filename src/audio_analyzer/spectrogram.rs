@@ -4,16 +4,15 @@ use crate::audio::StreamParameters;
 
 use super::{AnalyzerParameters, ManyChannelsSpectrums, Spectrum};
 
-type Magnitude = f32;
-type MultiChannel<T> = Vec<T>;
-type TimeSeries<T> = Vec<T>;
+pub type Magnitude = f32;
+pub type MultiChannel<T> = Vec<T>;
+pub type TimeSeries<T> = Vec<T>;
 
 pub struct Spectrogram {
     stream_parameters: Arc<StreamParameters>,
     analyzer_parameters: Arc<AnalyzerParameters>,
     spectrum_history: TimeSeries<MultiChannel<Spectrum>>,
-    peek_magnitude: TimeSeries<MultiChannel<Magnitude>>,
-    rms_magnitude: TimeSeries<MultiChannel<Magnitude>>,
+    power_spectrum_rms: TimeSeries<MultiChannel<Magnitude>>,
 }
 
 impl Spectrogram {
@@ -29,12 +28,7 @@ impl Spectrogram {
                 &analyzer_parameters,
                 vec![0.0; analyzer_parameters.spectrum_width],
             ),
-            peek_magnitude: Self::create_time_series::<Magnitude>(
-                &stream_parameters,
-                &analyzer_parameters,
-                0.0,
-            ),
-            rms_magnitude: Self::create_time_series::<Magnitude>(
+            power_spectrum_rms: Self::create_time_series::<Magnitude>(
                 &stream_parameters,
                 &analyzer_parameters,
                 0.0,
@@ -61,30 +55,10 @@ impl Spectrogram {
     }
 
     pub fn push_spectrums(&mut self, spectrums: ManyChannelsSpectrums) {
-        let mut rms_all_channels: MultiChannel<Magnitude> = vec![];
-        let mut peek_all_channels: MultiChannel<Magnitude> = vec![];
-
-        for spectrum in &spectrums {
-            let mut peek_magnitude: Magnitude = 0.0;
-            let mut rms_magnitude: Magnitude = 0.0;
-            for value in spectrum {
-                peek_magnitude = peek_magnitude.max(*value);
-                rms_magnitude += value.powi(2);
-            }
-            rms_magnitude = rms_magnitude.sqrt() / spectrum.len() as f32;
-
-            peek_all_channels.push(peek_magnitude);
-            rms_all_channels.push(rms_magnitude);
-        }
-
         self.spectrum_history.push(spectrums);
 
         Self::trimm_time_series(
-            &mut self.peek_magnitude,
-            self.analyzer_parameters.length_of_history,
-        );
-        Self::trimm_time_series(
-            &mut self.rms_magnitude,
+            &mut self.power_spectrum_rms,
             self.analyzer_parameters.length_of_history,
         );
         Self::trimm_time_series(
@@ -93,7 +67,20 @@ impl Spectrogram {
         );
     }
 
+    pub fn push_power_spectrum_rms(&mut self, power_spectrum_rms: MultiChannel<Magnitude>) {
+        self.power_spectrum_rms.push(power_spectrum_rms);
+
+        Self::trimm_time_series(
+            &mut self.power_spectrum_rms,
+            self.analyzer_parameters.length_of_history,
+        );
+    }
+
     pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
         self.spectrum_history.last().unwrap().clone()
+    }
+
+    pub fn get_total_energy(&self) -> &Vec<Vec<f32>> {
+        &self.power_spectrum_rms
     }
 }

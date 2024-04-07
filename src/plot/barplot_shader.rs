@@ -18,11 +18,11 @@ impl BarplotShader {
     pub fn new() -> Option<BarplotShader> {
         let shader_program = ShaderProgram::new_from_string(
             include_str!("resources/barplot.vert"),
-            include_str!("resources/barplot.frag"),
+            include_str!("resources/basic.frag"),
         )
         .expect(&format!(
             "Failed to create BarplotShader: {}, {}.",
-            "resources/barplot.vert", "resources/barplot.vert"
+            "resources/barplot.vert", "resources/basic.frag"
         ));
 
         let mut vertex_array_id = 0;

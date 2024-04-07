@@ -13,7 +13,7 @@ use crate::{
     audio::audio_stream::AudioStream,
     audio_analyzer::AudioAnalyzysProvider,
     glfw_egui::{egui_glfw, glfw_painter},
-    plot::{BarSpectrumRenderer, TextureRenderTarget},
+    plot::{BarSpectrumRenderer, MagnitudeTimelineRenderer, TextureRenderTarget},
 };
 
 use super::{add_rows, egui_helpers, helpers};
@@ -129,23 +129,24 @@ impl UiWindow {
 }
 
 struct UiSpectrumRenderer {
-    spectrum_renderer: BarSpectrumRenderer,
+    // spectrum_renderer: BarSpectrumRenderer,
+    magnitude_timeline: MagnitudeTimelineRenderer,
     spectrum_texture_renderer: TextureRenderTarget,
     spectrum_tex_id: TextureId,
 }
 
 impl UiSpectrumRenderer {
     fn new(ui_window: &mut UiWindow) -> UiSpectrumRenderer {
-        let mut spectrum_renderer = BarSpectrumRenderer::new();
+        let mut magnitude_timeline = MagnitudeTimelineRenderer::new();
         let spectrum_texture_renderer = TextureRenderTarget::new((1, 1));
 
         let spectrum_tex_id = ui_window
             .painter
             .new_opengl_texture(spectrum_texture_renderer.get_texture_id());
-        spectrum_renderer.flip_vertically(true);
+        magnitude_timeline.flip_vertically(true);
 
         UiSpectrumRenderer {
-            spectrum_renderer,
+            magnitude_timeline,
             spectrum_texture_renderer,
             spectrum_tex_id,
         }
@@ -157,16 +158,17 @@ impl UiSpectrumRenderer {
     ) {
         let spectrum =
             spectrum_provider.lock().unwrap().get_latest_spectrum()[channel_number].clone();
-        self.spectrum_renderer.set_spectrum(spectrum.as_slice());
+        self.magnitude_timeline
+            .set_magnitude_timelie(&spectrum_provider.lock().unwrap().get_magnitude_timeline());
     }
 
     fn render(&mut self, ui: &mut Ui) {
         let convert_vec2_to_tuple = |resolution: Vec2| (resolution.x as u32, resolution.y as u32);
         let resolution = convert_vec2_to_tuple(ui.available_size());
-        self.spectrum_renderer.set_view(resolution);
+        self.magnitude_timeline.set_view(resolution);
         self.spectrum_texture_renderer.set_resolution(resolution);
         self.spectrum_texture_renderer
-            .render(&self.spectrum_renderer);
+            .render(&self.magnitude_timeline);
 
         ui.add(Image::from_texture(SizedTexture {
             id: self.spectrum_tex_id,

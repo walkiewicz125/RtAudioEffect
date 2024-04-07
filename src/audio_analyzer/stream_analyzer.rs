@@ -7,7 +7,10 @@ use log::{info, trace};
 
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
-use super::{AnalyzerParameters, ManyChannelsSpectrums, Spectrogram, SpectrumAnalyzer};
+use super::{
+    AnalyzerParameters, Magnitude, ManyChannelsSpectrums, MultiChannel, Spectrogram,
+    SpectrumAnalyzer, TimeSeries,
+};
 
 pub struct StreamAnalyzer {
     audio_buffer: Arc<Mutex<AudioBuffer>>,
@@ -20,12 +23,11 @@ pub struct StreamAnalyzer {
 pub trait AudioAnalyzysProvider {
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
+    fn get_magnitude_timeline(&self) -> &TimeSeries<MultiChannel<Magnitude>>;
 }
 
 impl AudioStreamConsumer for StreamAnalyzer {
     fn process_new_samples(&mut self) {
-        trace!("Processing new samples");
-
         let total_sample_count = self.analyzer_parameters.spectrum_width;
         let new_samples = self.analyzer_parameters.refresh_time_in_samples;
 
@@ -46,7 +48,10 @@ impl AudioStreamConsumer for StreamAnalyzer {
                     trace!("Processing samples for channel: {}", channel);
                     spectrums.push(self.spectrum_analyzer.analyze(&samples));
                 }
+
+                let ps_rms = self.spectrum_analyzer.get_ps_rms(&spectrums);
                 self.spectrogram.push_spectrums(spectrums);
+                self.spectrogram.push_power_spectrum_rms(ps_rms);
             }
         }
     }
@@ -67,6 +72,10 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
 
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
         self.get_latest_spectrum()
+    }
+
+    fn get_magnitude_timeline(&self) -> &TimeSeries<MultiChannel<Magnitude>> {
+        self.spectrogram.get_total_energy()
     }
 }
 
@@ -99,7 +108,10 @@ impl StreamAnalyzer {
                 buffer_duration,
             ))),
             analyzer_parameters: parameters.clone(),
-            spectrum_analyzer: SpectrumAnalyzer::new(spectrum_width),
+            spectrum_analyzer: SpectrumAnalyzer::new(
+                spectrum_width,
+                stream_parameters.sample_rate as usize,
+            ),
             spectrogram: Spectrogram::new(parameters, stream_parameters.clone()),
             is_alive: true,
         }
