@@ -24,6 +24,7 @@ pub trait AudioAnalyzysProvider {
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
     fn get_magnitude_timeline(&self) -> &TimeSeries<MultiChannel<Magnitude>>;
+    fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32));
 }
 
 impl AudioStreamConsumer for StreamAnalyzer {
@@ -76,6 +77,10 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
 
     fn get_magnitude_timeline(&self) -> &TimeSeries<MultiChannel<Magnitude>> {
         self.spectrogram.get_total_energy()
+    }
+
+    fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32)) {
+        self.spectrogram.get_spectrogram_for_channel(channel)
     }
 }
 

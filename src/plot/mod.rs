@@ -6,10 +6,12 @@ mod magnitude_timeline_renderer;
 mod magnitude_timeline_shade;
 mod primitives;
 mod renderer;
+mod spectrogram_renderer;
 mod texture_render_target;
 
 pub use bar_spectrum_renderer::BarSpectrumRenderer;
 pub use lines_renderer::LinesRenderer;
 pub use magnitude_timeline_renderer::MagnitudeTimelineRenderer;
 pub use magnitude_timeline_shade::MagnitudeTimelineShader;
+pub use spectrogram_renderer::SpectrogramRenderer;
 pub use texture_render_target::TextureRenderTarget;

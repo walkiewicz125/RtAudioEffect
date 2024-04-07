@@ -83,4 +83,19 @@ impl Spectrogram {
     pub fn get_total_energy(&self) -> &Vec<Vec<f32>> {
         &self.power_spectrum_rms
     }
+
+    pub fn get_spectrogram_for_channel(
+        &self,
+        channel: usize,
+    ) -> (TimeSeries<Magnitude>, (u32, u32)) {
+        let mut spectrogram = vec![];
+
+        for time_spectum in &self.spectrum_history {
+            let mut spectrum = time_spectum[channel].clone();
+            spectrogram.append(&mut spectrum);
+        }
+        let x_count = self.analyzer_parameters.spectrum_width / 2;
+        let y_count = self.spectrum_history.len();
+        (spectrogram, (x_count as u32, y_count as u32))
+    }
 }

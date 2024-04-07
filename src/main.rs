@@ -38,7 +38,7 @@ fn main() {
     ));
 
     let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
-        Duration::from_secs_f32(0.005),
+        Duration::from_secs_f32(0.01),
         Duration::from_secs_f32(1.0),
         4800,
         audio_stream.lock().unwrap().get_parameters(),
