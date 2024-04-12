@@ -21,21 +21,56 @@
 - [x] <b>BUG: fix shader to render apropriate number of bars when changing length</b>
 #### milestone 4
 
-# 2. Render wave plot
+# 2. Render wave plot - POC
 - [x] 1. Make first shader
 - [x] 2. Make code similar to bar for drawing.
 - [x] 3. Improve current shader. Render test lines.
 - [x] 3.5. Fixing line renderer. Drawing lines with connector. Open/Closed lines
 - [x] 4. Clean up code and refactor to make it more usable.
-#### milestone 5
+#### milestone 6 Render waveplot - oversamplingg needed
 - [ ] 1. Make view for rendering waveplot on top half of screen and spectrum on bottom half. Draw test lines there.
 - [x] 1.1 Render to texture
 - [x] 1.2 Update UI to render parameters editor and graph side by side
-- [ ] 1.3 Refactor
-- [ ] 2. Use egui for managing layout? make window with spectrum view and window with waveform view. Render to texture? of required size?
+- [ ] 2. Oversampling using cosin interpolation.
+- [ ] 3. Refactor
+#### milestone 7 Render overal waveform magnitude. On one chart.
+- [ ] 1. Render peek amplitude of peek frequency. Highest peek.
+- [ ] 2. Render total spectrum magnitude. Sum of all bins.
+- [x] 3. Render mean spectrum magnitude. Mean of all bins.
 
-# 3. Time analysis of spectrum
-# 3.1 Make filters for frequency bands.
-* Store them in a time buffer for further analysys
-# 3.2 Make horizontal view for each frequency band using lines with height as magnitude
-* Fresh data on the right. Past data on the left. Like waveplot.
+# 3. Render spectrogram
+#### milestone 6 Render spectrogram - POC.
+- [x] 1. POC:
+- [x] 1.1 Generate texture and us it in gui. (linear freq axis and magnitude as color)
+- [ ] 2. Finall:
+- [ ] 2.1 Render texture on a rectangle
+- [ ] 2.2 Add transformations:
+- [ ] 2.2.1 Rotation. Flip horizntal and vertical.
+- [ ] 2.2.2 Freq. axis scale to logarithmic
+- [ ] 2.2.3 Generate nice colors for magnitude value.
+
+# 4. Finalize rendering of parameters/data
+- [ ] 1. Refactor rendering classes to be more managable.
+- [ ] 2. Edit gui code to allow for more flexible placement of charts.
+- [ ] 2.1. POC: Some refactor of current classes
+- [ ] 2.2. Wrap/add trait for rendering classes like "ChartView"
+- [ ] 3. Add options to enable/disable some charts
+- [ ] 4. Add proper DI and interfaces.
+
+# 4.5 Beautifying of renderers.
+- [ ] 1. Select better color scheme
+- [ ] 2. Add lines markers for frequency bands in log scale. like: 10, 20, 30... 100, 200, 300... 1k, 2k, 3k... 10k, 20k
+- [ ] 3. Add axis drawing, axis markers, text.
+
+
+# 5. [optional] Audio device source selection
+- [ ] 1. Add option to switch audio device. Dropdown like menu.
+- [ ] 1.1 POC: Just device selection.
+- [ ] 1.2 Proper device parameters update. if sampling rate is different all dependent classes need to update to that
+- [ ] 2. Follow default audio device
+- [ ] 2.1 If default audio device is selected. Monitor that device for changes. And switch when needed.
+
+# 10. Event generation - analysis of spectrum - POC
+- [ ] 1. Generate some events. Like beat detection on low/mid frequencies.
+
+# 20. Rendering of events on a chart
