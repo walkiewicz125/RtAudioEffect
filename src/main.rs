@@ -1,13 +1,10 @@
-mod glfw_egui;
-mod logger;
-mod plot;
-mod ui_controller;
-
 mod audio;
 mod audio_analyzer;
-mod audio_processor;
+mod logger;
+mod ui;
+
+use egui_glfw::AppWindow;
 use log::info;
-use ui_controller::Resolution;
 
 use std::{
     sync::{Arc, Mutex},
@@ -15,14 +12,14 @@ use std::{
     time::Duration,
 };
 
-use crate::audio::{
-    audio_stream::AudioStream, audio_stream_consumer::AudioStreamConsumer, AudioManager,
+use crate::{
+    audio::{audio_stream::AudioStream, AudioManager, AudioStreamConsumer},
+    audio_analyzer::StreamAnalyzer,
+    ui::ui_controller::UiController,
 };
-use crate::{audio_analyzer::StreamAnalyzer, ui_controller::UiController};
 
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
-const DEFAULT_RESOLUTION: Resolution = (SCREEN_WIDTH, SCREEN_HEIGHT);
 
 fn main() {
     info!("Hello RtAudioEffect!");
@@ -32,6 +29,8 @@ fn main() {
     {
         eprintln!("log::set_logger failed: {err:#?}");
     }
+
+    let mut app_window = AppWindow::new_default(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     let audio_stream = Arc::new(Mutex::new(
         AudioStream::new(AudioManager::get_default_loopback().unwrap()).unwrap(),
@@ -49,10 +48,9 @@ fn main() {
         .unwrap()
         .add_stream_consumer(analyzer.clone());
 
-    let mut ui_controller: UiController =
-        UiController::new(analyzer.clone(), audio_stream.clone(), DEFAULT_RESOLUTION);
-
     audio_stream.lock().unwrap().start();
+    let ui_controller = UiController::new(analyzer.clone(), audio_stream);
+    ui_controller.set_text_styles(app_window.get_egui_context());
 
     let analyzer_clone = analyzer.clone();
     let analyzer_thread = thread::spawn(move || {
@@ -61,13 +59,14 @@ fn main() {
         }
     });
 
-    while !ui_controller.is_closing() {
-        ui_controller.render();
+    while !app_window.window.should_close() {
+        app_window.begin_frame();
+        let egui_context = app_window.get_egui_context();
+        ui_controller.update_data();
+        egui::CentralPanel::default().show(&egui_context, |ui| {
+            ui.add(ui_controller.get_central_panel());
+        });
+
+        app_window.end_frame();
     }
-
-    audio_stream.lock().unwrap().stop();
-    analyzer.lock().unwrap().kill();
-    analyzer_thread.join().unwrap();
-
-    info!("Goodbye RtAudioEffect!");
 }

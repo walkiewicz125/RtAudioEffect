@@ -317,6 +317,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_glfw"
+version = "0.52.0"
+source = "git+https://github.com/walkiewicz125/egui_glfw.git#af5e1268be632f54592e0db6f5d8090d9b870551"
+dependencies = [
+ "cli-clipboard",
+ "egui",
+ "gl",
+ "glfw",
+]
+
+[[package]]
 name = "emath"
 version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -936,6 +947,7 @@ dependencies = [
  "colored",
  "cpal",
  "egui",
+ "egui_glfw",
  "gl",
  "glam",
  "glfw",
