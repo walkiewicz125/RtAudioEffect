@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Display;
 
 #[derive(Clone)]
 pub struct StreamParameters {

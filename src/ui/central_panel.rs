@@ -1,13 +1,16 @@
 use std::sync::{Arc, Mutex};
 
-use egui::{Align, CollapsingHeader, Layout, Separator, Ui, Vec2, Widget};
+use egui::{vec2, Align, CollapsingHeader, Layout, Separator, Ui, Vec2, Widget};
 
 use crate::{audio::audio_stream::AudioStream, audio_analyzer::AudioAnalyzysProvider};
 
 use super::{
     helpers::{add_columns, add_rows},
-    plot::BarSpectrumRenderer,
-    spectrum_renderer_widget::SprectrumRendererWidget,
+    plot::spectrum::{
+        spectrogram_renderer::SpectrogramRenderer,
+        spectrogram_renderer_widget::SpectrogramRendererWidget,
+        spectrum_renderer::SpectrumRenderer, spectrum_renderer_widget::SprectrumRendererWidget,
+    },
 };
 
 pub struct CentralPanel {
@@ -15,14 +18,18 @@ pub struct CentralPanel {
     audio_stream: Arc<Mutex<AudioStream>>,
     spectrum_left: SprectrumRendererWidget,
     spectrum_right: SprectrumRendererWidget,
+    spectrogram_left: SpectrogramRendererWidget,
+    spectrogram_right: SpectrogramRendererWidget,
 }
 
 impl CentralPanel {
     pub fn build(
         audio_analyzer: Arc<Mutex<dyn AudioAnalyzysProvider>>,
         audio_stream: Arc<Mutex<AudioStream>>,
-        spectrum_renderer_left: Arc<Mutex<BarSpectrumRenderer>>,
-        spectrum_renderer_right: Arc<Mutex<BarSpectrumRenderer>>,
+        spectrum_renderer_left: Arc<Mutex<SpectrumRenderer>>,
+        spectrum_renderer_right: Arc<Mutex<SpectrumRenderer>>,
+        spectrogram_renderer_left: Arc<Mutex<SpectrogramRenderer>>,
+        spectrogram_renderer_right: Arc<Mutex<SpectrogramRenderer>>,
     ) -> Self {
         Self {
             audio_analyzer,
@@ -32,6 +39,12 @@ impl CentralPanel {
             },
             spectrum_right: SprectrumRendererWidget {
                 renderer: spectrum_renderer_right,
+            },
+            spectrogram_left: SpectrogramRendererWidget {
+                renderer: spectrogram_renderer_left,
+            },
+            spectrogram_right: SpectrogramRendererWidget {
+                renderer: spectrogram_renderer_right,
             },
         }
     }
@@ -80,7 +93,6 @@ impl Widget for CentralPanel {
                     });
                 });
         };
-
         let draw_fft_parameters = |ui: &mut Ui| {
             CollapsingHeader::new("FFT parameters")
                 .default_open(true)
@@ -95,7 +107,6 @@ impl Widget for CentralPanel {
                     });
                 });
         };
-
         let draw_stream_controls = |ui: &mut Ui| {
             ui.strong("Stream control:");
             ui.columns(2, |uis| {
@@ -107,7 +118,6 @@ impl Widget for CentralPanel {
                 }
             })
         };
-
         let draw_parameters_and_control_panel = |ui: &mut Ui| {
             draw_stream_parameters(ui);
             ui.separator();
@@ -133,14 +143,10 @@ impl Widget for CentralPanel {
 
             ui.add(Separator::default().vertical());
             add_columns(ui, 2, |ui| {
-                add_rows(&mut ui[0], 2, |ui| {
-                    ui[0].add(self.spectrum_left);
-                    ui[1].add(self.spectrum_right);
-                });
-                add_rows(&mut ui[1], 2, |ui| {
-                    // ui[0].add(self.spectrogram_left);
-                    // ui[1].add(self.spectrogram_right);
-                });
+                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 3.0), self.spectrum_left);
+                ui[0].add(self.spectrogram_left);
+                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 3.0), self.spectrum_right);
+                ui[1].add(self.spectrogram_right);
             });
             response
         })

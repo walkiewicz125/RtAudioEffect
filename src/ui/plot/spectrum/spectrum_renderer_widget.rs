@@ -3,11 +3,10 @@ use std::sync::{Arc, Mutex};
 use egui::{PaintCallback, Sense, Widget};
 use egui_glfw::back_end::PaintCallbackFn;
 
-use super::plot::BarSpectrumRenderer;
-use super::plot::Renderer;
+use super::spectrum_renderer::SpectrumRenderer;
 
 pub struct SprectrumRendererWidget {
-    pub renderer: Arc<Mutex<BarSpectrumRenderer>>,
+    pub renderer: Arc<Mutex<SpectrumRenderer>>,
 }
 
 impl Widget for SprectrumRendererWidget {
@@ -20,7 +19,7 @@ impl Widget for SprectrumRendererWidget {
                 self.renderer
                     .lock()
                     .unwrap()
-                    .set_view((rect.width() as u32, rect.height() as u32));
+                    .set_render_size((rect.width() as u32, rect.height() as u32));
                 self.renderer.lock().unwrap().render();
             })),
         };

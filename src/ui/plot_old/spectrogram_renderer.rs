@@ -1,8 +1,6 @@
 use glam::Mat4;
 
-use super::{
-    barplot_shader::BarplotShader, primitives::storage_buffer::StorageBuffer, renderer::Renderer,
-};
+use super::{barplot_shader::BarplotShader, primitives::storage_buffer::StorageBuffer};
 
 pub struct SpectrogramRenderer {
     frame_buffer_name: u32,
@@ -111,7 +109,7 @@ impl SpectrogramRenderer {
     pub fn set_texture_data(&mut self, texture_data: &[f32], resolution: (u32, u32)) {
         let mut data = vec![];
         for p in texture_data {
-            let v = (*p);
+            let v = *p;
             let b = (2.0 - 0.25 - v).min(1.0).max(0.0);
             let r = (-1.0 + 0.25 + v).min(1.0).max(0.0);
             let g = 0.0;

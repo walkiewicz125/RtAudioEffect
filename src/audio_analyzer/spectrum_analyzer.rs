@@ -1,4 +1,4 @@
-use std::{ops::Mul, sync::Arc};
+use std::sync::Arc;
 
 use log::trace;
 use rustfft::{num_complex::Complex, Fft, FftPlanner};
@@ -79,22 +79,11 @@ impl SpectrumAnalyzer {
         let mut spectrum: Spectrum = self
             .work_buffer
             .iter()
-            .map(|number| number.norm_sqr())
+            .map(|number| number.norm() / self.window.sum_window)
             .take(self.spectrum_width / 2)
             .collect();
         spectrum[0] = 0.0;
 
         spectrum
-    }
-
-    pub(crate) fn get_ps_rms(&self, spectrums: &[Vec<f32>]) -> MultiChannel<Magnitude> {
-        let mut multichannel_ps_rms: MultiChannel<Magnitude> = vec![];
-        for spectrum in spectrums {
-            let spectrum_sum: f32 = spectrum.iter().map(|&bar| bar.abs()).sum();
-            let power_spectrum_rms = 2.0 * spectrum_sum / self.window.sum_window.powi(2);
-            let linear_power_spectrum_rms = power_spectrum_rms.sqrt();
-            multichannel_ps_rms.push(linear_power_spectrum_rms.sqrt());
-        }
-        multichannel_ps_rms
     }
 }

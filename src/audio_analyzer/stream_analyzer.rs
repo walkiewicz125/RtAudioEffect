@@ -1,5 +1,6 @@
 use std::{
     sync::{Arc, Mutex},
+    thread,
     time::Duration,
 };
 
@@ -8,7 +9,7 @@ use log::{info, trace};
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
 use super::{
-    AnalyzerParameters, Magnitude, ManyChannelsSpectrums, MultiChannel, Spectrogram,
+    AnalyzerParameters, Magnitude, ManyChannelsSpectrums, MultiChannel, Spectrogram, Spectrum,
     SpectrumAnalyzer, TimeSeries,
 };
 
@@ -23,7 +24,6 @@ pub struct StreamAnalyzer {
 pub trait AudioAnalyzysProvider {
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
-    fn get_magnitude_timeline(&self) -> &TimeSeries<MultiChannel<Magnitude>>;
     fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32));
 }
 
@@ -50,9 +50,7 @@ impl AudioStreamConsumer for StreamAnalyzer {
                     spectrums.push(self.spectrum_analyzer.analyze(&samples));
                 }
 
-                let ps_rms = self.spectrum_analyzer.get_ps_rms(&spectrums);
                 self.spectrogram.push_spectrums(spectrums);
-                self.spectrogram.push_power_spectrum_rms(ps_rms);
             }
         }
     }
@@ -73,10 +71,6 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
 
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
         self.get_latest_spectrum()
-    }
-
-    fn get_magnitude_timeline(&self) -> &TimeSeries<MultiChannel<Magnitude>> {
-        self.spectrogram.get_total_energy()
     }
 
     fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32)) {

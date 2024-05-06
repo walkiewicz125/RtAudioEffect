@@ -48,13 +48,10 @@ const vec4 bar_colors[6] = vec4[6](
     vec4(0.4, 1.0, 0.0, 1.0),
     vec4(0.0, 0.4, 1.0, 1.0)
 );
-float log10(float x)
-{
-    return log(x);//log(x) * inv_ln_of_10;
-}
+
 float log_of_bar(int bar_id)
 {
-    return log10(max(1.0, float(bar_id)))/log10(bar_count);
+    return log(max(1.0, float(bar_id)))/log(bar_count);
 }
 
 float bar_width(int bar_id)
