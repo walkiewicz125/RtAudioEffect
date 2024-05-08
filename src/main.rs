@@ -4,7 +4,8 @@ mod logger;
 mod ui;
 
 use egui_glfw::AppWindow;
-use log::info;
+use log::{error, info};
+use mdns_sd::{ServiceDaemon, ServiceInfo};
 
 use std::{
     sync::{Arc, Mutex},
@@ -103,7 +104,7 @@ impl AppContext {
         }
     }
 
-    fn run(&mut self) {
+    fn run(&mut self) -> bool {
         let analyzer_clone = self.analyzer.clone();
         let analyzer_thread = thread::spawn(move || {
             while analyzer_clone.lock().unwrap().is_alive() {
@@ -130,6 +131,8 @@ impl AppContext {
         self.audio_stream.lock().unwrap().stop();
         self.analyzer.lock().unwrap().kill();
         analyzer_thread.join().unwrap();
+
+        true
     }
 }
 
@@ -142,7 +145,26 @@ fn main() {
         eprintln!("log::set_logger failed: {err:#?}");
     }
 
-    let context = AppContext::new().run();
+    let mdns = ServiceDaemon::new().expect("Failed to create mDNS daemon");
+    let rt_audio_efect_service = ServiceInfo::new(
+        "_RtAudioEffect._udp.local.",
+        "RtAudioEffect",
+        "RtAudioEffect.local.",
+        "127.0.0.1",
+        12337,
+        None,
+    )
+    .unwrap()
+    .enable_addr_auto();
 
-    info!("Goodbye RtAudioEffect!");
+    mdns.register(rt_audio_efect_service)
+        .expect("Failed to register RtAudioEffect service in mDNS deamon");
+
+    let mut context = AppContext::new();
+
+    if context.run() {
+        info!("RtAudioEffect exit successfully");
+    } else {
+        error!("RtAudioEffect exit with error");
+    }
 }

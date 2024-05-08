@@ -18,6 +18,7 @@ egui = "0.27"
 log = "0.4.*"
 colored = "2.1.*"
 glamour = "0.11.*"
+mdns-sd = "0.11.*"
 
 [dependencies.clipboard]
 package = "cli-clipboard"
