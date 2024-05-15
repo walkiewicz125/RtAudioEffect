@@ -1,8 +1,11 @@
 mod audio;
 mod audio_analyzer;
+mod audio_annotator;
 mod logger;
 mod ui;
 
+use audio_analyzer::{ManyChannelsSpectrums, StreamAnalyzerReceiver};
+use audio_annotator::StreamAnalyzerAnnotator;
 use egui_glfw::AppWindow;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
@@ -22,42 +25,45 @@ use crate::{
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
 
+fn main() {
+    info!("Hello RtAudioEffect!");
+
+    if let Err(err) =
+        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+    {
+        eprintln!("log::set_logger failed: {err:#?}");
+    }
+
+    let mdns = ServiceDaemon::new().expect("Failed to create mDNS daemon");
+    let rt_audio_efect_service = ServiceInfo::new(
+        "_RtAudioEffect._udp.local.",
+        "RtAudioEffect",
+        "RtAudioEffect.local.",
+        "127.0.0.1",
+        12337,
+        None,
+    )
+    .unwrap()
+    .enable_addr_auto();
+
+    mdns.register(rt_audio_efect_service)
+        .expect("Failed to register RtAudioEffect service in mDNS deamon");
+
+    let mut context = AppContext::new();
+
+    if context.run() {
+        info!("RtAudioEffect exit successfully");
+    } else {
+        error!("RtAudioEffect exit with error");
+    }
+}
+
 struct AppContext {
     audio_stream: Arc<Mutex<AudioStream>>,
     analyzer: Arc<Mutex<StreamAnalyzer>>,
+    annotator: Arc<Mutex<StreamAnalyzerAnnotator>>,
     app_window: AppWindow,
     ui_controller: UiController,
-}
-
-extern "system" fn gl_debug_output(
-    source: u32,
-    gltype: u32,
-    id: u32,
-    severity: u32,
-    _length: i32,
-    message: *const i8,
-    _user_param: *mut std::ffi::c_void,
-) {
-    unsafe {
-        let message = std::ffi::CStr::from_ptr(message).to_str().unwrap();
-        match severity {
-            gl::DEBUG_SEVERITY_HIGH => {
-                log::error!("OpenGL Error: {}", message);
-            }
-            gl::DEBUG_SEVERITY_MEDIUM => {
-                log::warn!("OpenGL Warning: {}", message);
-            }
-            gl::DEBUG_SEVERITY_LOW => {
-                log::info!("OpenGL Info: {}", message);
-            }
-            gl::DEBUG_SEVERITY_NOTIFICATION => {
-                log::debug!("OpenGL Notification: {}", message);
-            }
-            _ => {
-                log::trace!("OpenGL Message: {}", message);
-            }
-        }
-    }
 }
 
 impl AppContext {
@@ -72,6 +78,16 @@ impl AppContext {
             4800,
             audio_stream.lock().unwrap().get_parameters(),
         )));
+        let annotator = Arc::new(Mutex::new(StreamAnalyzerAnnotator::new(
+            analyzer.lock().unwrap().get_analyzer_parameters(),
+            Duration::from_secs_f32(1.0),
+            audio_stream.lock().unwrap().get_parameters().channels as usize,
+        )));
+
+        analyzer
+            .lock()
+            .unwrap()
+            .register_receiver(annotator.clone());
 
         audio_stream
             .lock()
@@ -82,23 +98,10 @@ impl AppContext {
         let ui_controller = UiController::new(analyzer.clone(), audio_stream.clone());
         ui_controller.set_text_styles(app_window.get_egui_context());
 
-        unsafe {
-            gl::Enable(gl::DEBUG_OUTPUT);
-            gl::Enable(gl::DEBUG_OUTPUT_SYNCHRONOUS);
-            gl::DebugMessageCallback(Some(gl_debug_output), std::ptr::null());
-            gl::DebugMessageControl(
-                gl::DONT_CARE,
-                gl::DONT_CARE,
-                gl::DONT_CARE,
-                0,
-                std::ptr::null(),
-                gl::TRUE,
-            );
-        }
-
         AppContext {
             audio_stream,
             analyzer,
+            annotator,
             app_window,
             ui_controller,
         }
@@ -133,38 +136,5 @@ impl AppContext {
         analyzer_thread.join().unwrap();
 
         true
-    }
-}
-
-fn main() {
-    info!("Hello RtAudioEffect!");
-
-    if let Err(err) =
-        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
-    {
-        eprintln!("log::set_logger failed: {err:#?}");
-    }
-
-    let mdns = ServiceDaemon::new().expect("Failed to create mDNS daemon");
-    let rt_audio_efect_service = ServiceInfo::new(
-        "_RtAudioEffect._udp.local.",
-        "RtAudioEffect",
-        "RtAudioEffect.local.",
-        "127.0.0.1",
-        12337,
-        None,
-    )
-    .unwrap()
-    .enable_addr_auto();
-
-    mdns.register(rt_audio_efect_service)
-        .expect("Failed to register RtAudioEffect service in mDNS deamon");
-
-    let mut context = AppContext::new();
-
-    if context.run() {
-        info!("RtAudioEffect exit successfully");
-    } else {
-        error!("RtAudioEffect exit with error");
     }
 }

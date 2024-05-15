@@ -13,11 +13,16 @@ use super::{
     SpectrumAnalyzer, TimeSeries,
 };
 
+pub trait StreamAnalyzerReceiver: Send {
+    fn receive(&mut self, spectrums: &ManyChannelsSpectrums);
+}
+
 pub struct StreamAnalyzer {
     audio_buffer: Arc<Mutex<AudioBuffer>>,
     analyzer_parameters: Arc<AnalyzerParameters>,
     spectrum_analyzer: SpectrumAnalyzer,
     spectrogram: Spectrogram,
+    receivers: Vec<Arc<Mutex<dyn StreamAnalyzerReceiver>>>,
     is_alive: bool,
 }
 
@@ -50,7 +55,11 @@ impl AudioStreamConsumer for StreamAnalyzer {
                     spectrums.push(self.spectrum_analyzer.analyze(&samples));
                 }
 
-                self.spectrogram.push_spectrums(spectrums);
+                self.spectrogram.push_spectrums(spectrums.clone());
+
+                for receiver in self.receivers.iter() {
+                    receiver.lock().unwrap().receive(&spectrums);
+                }
             }
         }
     }
@@ -70,7 +79,7 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
     }
 
     fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
-        self.get_latest_spectrum()
+        self.spectrogram.get_latest_spectrum()
     }
 
     fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32)) {
@@ -99,6 +108,7 @@ impl StreamAnalyzer {
             length_of_history: number_of_spectrums_in_history,
             refresh_time,
             spectrogram_duration: buffer_duration,
+            sample_rate: stream_parameters.sample_rate,
         });
 
         StreamAnalyzer {
@@ -112,16 +122,20 @@ impl StreamAnalyzer {
                 stream_parameters.sample_rate as usize,
             ),
             spectrogram: Spectrogram::new(parameters, stream_parameters.clone()),
+            receivers: vec![],
             is_alive: true,
         }
     }
 
-    pub fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
-        self.analyzer_parameters.clone()
+    pub fn register_receiver(
+        &mut self,
+        stream_analyzer_receiver: Arc<Mutex<dyn StreamAnalyzerReceiver>>,
+    ) {
+        self.receivers.push(stream_analyzer_receiver);
     }
 
-    pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
-        self.spectrogram.get_latest_spectrum()
+    pub fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters> {
+        self.analyzer_parameters.clone()
     }
 
     pub fn kill(&mut self) {

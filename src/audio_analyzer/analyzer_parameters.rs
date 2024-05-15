@@ -6,4 +6,5 @@ pub struct AnalyzerParameters {
     pub length_of_history: usize,
     pub refresh_time: Duration,
     pub spectrogram_duration: Duration,
+    pub sample_rate: u32,
 }

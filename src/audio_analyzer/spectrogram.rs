@@ -103,16 +103,18 @@ impl Spectrogram {
         assert!(spectrums.len() == self.stream_parameters.channels as usize);
         assert!(spectrums.len() == self.spectrum_history.len());
 
-        for (i, data) in spectrums.into_iter().enumerate() {
+        spectrums.into_iter().enumerate().for_each(|(i, data)| {
             self.spectrum_history.channels[i].push(data);
-        }
+        });
     }
 
     pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
         let mut spectrums = vec![];
-        for channel in &self.spectrum_history.channels {
+
+        self.spectrum_history.channels.iter().for_each(|channel| {
             spectrums.push(channel.get_last().to_vec());
-        }
+        });
+
         spectrums
     }
 

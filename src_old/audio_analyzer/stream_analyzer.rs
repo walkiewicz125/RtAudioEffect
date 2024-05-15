@@ -105,6 +105,7 @@ impl StreamAnalyzer {
             length_of_history: number_of_spectrums_in_history,
             refresh_time,
             spectrogram_duration: buffer_duration,
+            sample_rate: stream_parameters.sample_rate,
         });
 
         StreamAnalyzer {
