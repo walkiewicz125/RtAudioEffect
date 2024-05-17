@@ -62,11 +62,13 @@ pub struct SpectrogramRenderer {
     vertices_buffer: VertexBuffer<Vector2>,
     client_size: UniformBuffer,
     view_matrix: UniformBuffer,
+    min_max: UniformBuffer,
     spectrogram_data: SpectrogramData,
 }
 
 impl SpectrogramRenderer {
     const SPECTROGRAM_DATA_BINDING_POINT: u32 = 2;
+    const MIN_MAX_BINDING_POINT: u32 = 3;
     const CLIENT_SIZE_BINDING_POINT: u32 = 1;
     const VIEW_MATRIX_BINDING_POINT: u32 = 0;
 
@@ -83,6 +85,7 @@ impl SpectrogramRenderer {
         shader_program.disable();
         let client_size = UniformBuffer::new_for::<Vec2>();
         let view_matrix = UniformBuffer::new_for::<Mat4>();
+        let min_max = UniformBuffer::new_for::<Vec2>();
         let spectrogram_data = SpectrogramData::new();
 
         Self {
@@ -91,6 +94,7 @@ impl SpectrogramRenderer {
             vertices_buffer,
             client_size,
             view_matrix,
+            min_max,
             spectrogram_data,
         }
     }
@@ -101,6 +105,7 @@ impl SpectrogramRenderer {
 
         self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
         self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
+        self.min_max.bind(Self::MIN_MAX_BINDING_POINT);
         self.spectrogram_data
             .bind(Self::SPECTROGRAM_DATA_BINDING_POINT);
 
@@ -127,7 +132,25 @@ impl SpectrogramRenderer {
     }
 
     pub fn buffer_data(&mut self, spectrogram: (TimeSeries<Magnitude>, (u32, u32))) {
+        let (time_series, dimensions) = &spectrogram;
+        let (width, length) = dimensions;
+
+        let min = time_series
+            .get_data()
+            .into_iter()
+            .cloned()
+            .reduce(f32::min)
+            .unwrap();
+
+        let max = time_series
+            .get_data()
+            .into_iter()
+            .cloned()
+            .reduce(f32::max)
+            .unwrap();
+
         self.spectrogram_data.buffer_data(spectrogram);
+        self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
     }
 
     fn generate_vertices_buffer() -> VertexBuffer<Vector2> {

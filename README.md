@@ -1,5 +1,6 @@
 Current view of application.
-![image](https://github.com/walkiewicz125/RtAudioEffect/assets/63741871/95c612de-aa09-4fa7-9c76-64b5c0e44ce0)
+<!-- insert window.png -->
+![image](window.png)
 
 
 ## Realy short status

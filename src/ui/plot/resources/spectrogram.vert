@@ -14,6 +14,11 @@ layout(std140, binding = 1) uniform ClientSize
   vec2 client_size;
 };
 
+layout(std140, binding = 3) uniform MinMax
+{
+  vec2 min_max;
+};
+
 layout(std430, binding = 2) buffer SpectrogramData
 {
   uint width;
@@ -39,6 +44,22 @@ float bar_width(uint bar_id)
 }
 
 
+// make function to convert linear value to rgb rainbow
+vec3 rainbow(float value)
+{
+    float h = (value) * 5.0;
+    float r = clamp(3.0 - abs(h - 4.0), 0.0, 1.0);
+    float g = clamp(2.0 - abs(h - 2.0), 0.0, 1.0);
+    float b = clamp(2.0 - abs(h - 1.0), 0.0, 1.0);
+    return vec3(r, g, b);
+}
+
+vec4 return_with_transparent_gradient(vec3 rgb)
+{
+    float alpha = (rgb.r + rgb.g + rgb.b) / 3.0;
+    return vec4(rgb, alpha);
+}
+
 void main()
 {
     uint freq_bar = gl_InstanceID % width;
@@ -50,6 +71,9 @@ void main()
     vec2 out_pos = vec2(vertex_x, vertex.y + time_step);
     out_pos.y *= client_size.y / length;
 
+    float mag = magnitude[gl_InstanceID];
+    mag = clamp((mag - min_max.x) / (min_max.y - min_max.x), 0.0, 1.0);
+
     gl_Position = projection * vec4(out_pos, 0.0, 1.0);
-    frag_color = vec4(magnitude[gl_InstanceID], magnitude[gl_InstanceID], magnitude[gl_InstanceID], magnitude[gl_InstanceID]);
+    frag_color = vec4(return_with_transparent_gradient(rainbow(mag)));
 }
