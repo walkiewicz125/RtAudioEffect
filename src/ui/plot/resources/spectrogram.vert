@@ -44,6 +44,47 @@ float bar_width(uint bar_id)
 }
 
 
+
+// make function to convert linear value to mix of colors 1-5
+vec4 color_map1(float value)
+{
+    vec4 color1 = vec4(0.0, 0.0, 1.0, 0.0);
+    vec4 color2 = vec4(0.0, 1.0, 1.0, 1.0);
+    vec4 color3 = vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 color4 = vec4(1.0, 1.0, 0.0, 1.0);
+    vec4 color5 = vec4(1.0, 0.0, 0.0, 1.0);
+
+    if (value < 0.25)
+        return mix(color1, color2, value * 4.0);
+    else if (value < 0.5)
+        return mix(color2, color3, (value - 0.25) * 4.0);
+    else if (value < 0.75)
+        return mix(color3, color4, (value - 0.5) * 4.0);
+    else // if (value < 1.0)
+        return mix(color4, color5, (value - 0.75) * 4.0);
+}
+
+vec4 color_map2(float value)
+{
+    vec4 color1 = vec4(1.0, 0.0, 1.0, 1.0);
+    vec4 color2 = vec4(0.0, 0.0, 1.0, 1.0);
+    vec4 color3 = vec4(0.0, 1.0, 1.0, 1.0);
+    vec4 color4 = vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 color5 = vec4(1.0, 1.0, 0.0, 1.0);
+    vec4 color6 = vec4(1.0, 0.0, 0.0, 1.0);
+
+    if (value < 0.2)
+        return mix(color1, color2, value * 5.0);
+    else if (value < 0.4)
+        return mix(color2, color3, (value - 0.2) * 5.0);
+    else if (value < 0.6)
+        return mix(color3, color4, (value - 0.4) * 5.0);
+    else if (value < 0.8)
+        return mix(color4, color5, (value - 0.6) * 5.0);
+    else
+        return mix(color5, color1, (value - 0.8) * 5.0);
+}
+
 // make function to convert linear value to rgb rainbow
 vec3 rainbow(float value)
 {
@@ -52,12 +93,6 @@ vec3 rainbow(float value)
     float g = clamp(2.0 - abs(h - 2.0), 0.0, 1.0);
     float b = clamp(2.0 - abs(h - 1.0), 0.0, 1.0);
     return vec3(r, g, b);
-}
-
-vec4 return_with_transparent_gradient(vec3 rgb)
-{
-    float alpha = (rgb.r + rgb.g + rgb.b) / 3.0;
-    return vec4(rgb, alpha);
 }
 
 void main()
@@ -71,9 +106,9 @@ void main()
     vec2 out_pos = vec2(vertex_x, vertex.y + time_step);
     out_pos.y *= client_size.y / length;
 
+    gl_Position = projection * vec4(out_pos, 0.0, 1.0);
+
     float mag = magnitude[gl_InstanceID];
     mag = clamp((mag - min_max.x) / (min_max.y - min_max.x), 0.0, 1.0);
-
-    gl_Position = projection * vec4(out_pos, 0.0, 1.0);
-    frag_color = vec4(return_with_transparent_gradient(rainbow(mag)));
+    frag_color = color_map1(mag);
 }

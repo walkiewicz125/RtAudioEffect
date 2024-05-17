@@ -13,6 +13,7 @@ pub struct SpectrumRenderer {
     vertex_array: VertexArray,
     client_size: UniformBuffer,
     view_matrix: UniformBuffer,
+    min_max: UniformBuffer,
     storage_buffer: StorageBufferArray<f32>,
 }
 impl SpectrumRenderer {
@@ -21,6 +22,7 @@ impl SpectrumRenderer {
     const BAR_VALUES_BUFFER_BINDING_POINT: u32 = 0;
     const CLIENT_SIZE_BINDING_POINT: u32 = 1;
     const VIEW_MATRIX_BINDING_POINT: u32 = 0;
+    const MIN_MAX_BINDING_POINT: u32 = 3;
     const VERTICES_COUNT: i32 = 6;
 
     pub fn new() -> Self {
@@ -29,6 +31,7 @@ impl SpectrumRenderer {
         let vertex_array = VertexArray::new();
         let client_size = UniformBuffer::new_for::<Vec2>();
         let view_matrix = UniformBuffer::new_for::<Mat4>();
+        let min_max = UniformBuffer::new_for::<Vec2>();
         let storage_buffer = StorageBufferArray::new();
 
         Self {
@@ -36,11 +39,17 @@ impl SpectrumRenderer {
             vertex_array,
             client_size,
             view_matrix,
+            min_max,
             storage_buffer,
         }
     }
 
     pub fn set_spectrum(&mut self, spectrum: &[f32]) {
+        let min = spectrum.into_iter().cloned().reduce(f32::min).unwrap();
+        let max = spectrum.into_iter().cloned().reduce(f32::max).unwrap();
+
+        self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
+
         self.storage_buffer.store_array(spectrum);
     }
 
@@ -62,6 +71,7 @@ impl SpectrumRenderer {
 
         self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
         self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
+        self.min_max.bind(Self::MIN_MAX_BINDING_POINT);
 
         unsafe {
             gl::DrawArrays(

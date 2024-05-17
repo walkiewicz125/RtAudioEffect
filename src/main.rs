@@ -6,9 +6,11 @@ mod ui;
 
 use audio_analyzer::{ManyChannelsSpectrums, StreamAnalyzerReceiver};
 use audio_annotator::StreamAnalyzerAnnotator;
+use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
+use ui::central_panel::HeatMapImage;
 
 use std::{
     sync::{Arc, Mutex},
@@ -95,8 +97,13 @@ impl AppContext {
             .add_stream_consumer(analyzer.clone());
 
         let app_window = AppWindow::new_default(SCREEN_WIDTH, SCREEN_HEIGHT);
-        let ui_controller = UiController::new(analyzer.clone(), audio_stream.clone());
-        ui_controller.set_text_styles(app_window.get_egui_context());
+
+        let ui_controller = UiController::new(
+            analyzer.clone(),
+            audio_stream.clone(),
+            HeatMapImage::new(app_window.get_egui_context()),
+        );
+        ui_controller.set_text_styles(&app_window.egui_context, 20.0);
 
         AppContext {
             audio_stream,

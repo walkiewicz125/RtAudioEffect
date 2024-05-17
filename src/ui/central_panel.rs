@@ -1,11 +1,22 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    borrow::BorrowMut,
+    marker::PhantomData,
+    sync::{Arc, Mutex},
+};
 
-use egui::{vec2, Align, CollapsingHeader, Layout, Separator, Ui, Vec2, Widget};
+use egui::{
+    epaint::{TessellationOptions, TextureManager},
+    load::SizedTexture,
+    vec2, Align, CollapsingHeader, Color32, ColorImage, Context, ImageData, ImageSource, Layout,
+    Pos2, Rect, Response, Rounding, Sense, Separator, Slider, TextureId, TextureOptions, Ui, Vec2,
+    Widget,
+};
+use log::info;
 
 use crate::{audio::audio_stream::AudioStream, audio_analyzer::AudioAnalyzysProvider};
 
 use super::{
-    helpers::{add_columns, add_rows},
+    helpers::{self, add_columns, add_rows},
     plot::spectrum::{
         spectrogram_renderer::SpectrogramRenderer,
         spectrogram_renderer_widget::SpectrogramRendererWidget,
@@ -20,6 +31,8 @@ pub struct CentralPanel {
     spectrum_right: SprectrumRendererWidget,
     spectrogram_left: SpectrogramRendererWidget,
     spectrogram_right: SpectrogramRendererWidget,
+    heat_map: HeatMapImage,
+    auto_range: bool,
 }
 
 impl CentralPanel {
@@ -30,6 +43,8 @@ impl CentralPanel {
         spectrum_renderer_right: Arc<Mutex<SpectrumRenderer>>,
         spectrogram_renderer_left: Arc<Mutex<SpectrogramRenderer>>,
         spectrogram_renderer_right: Arc<Mutex<SpectrogramRenderer>>,
+        heat_map: HeatMapImage,
+        auto_range: bool,
     ) -> Self {
         Self {
             audio_analyzer,
@@ -46,12 +61,14 @@ impl CentralPanel {
             spectrogram_right: SpectrogramRendererWidget {
                 renderer: spectrogram_renderer_right,
             },
+            heat_map,
+            auto_range,
         }
     }
 }
 
 impl Widget for CentralPanel {
-    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+    fn ui(mut self, ui: &mut egui::Ui) -> egui::Response {
         let stream_parameters = self.audio_stream.lock().unwrap().get_parameters();
         let analyzer_parameters = self
             .audio_analyzer
@@ -129,6 +146,24 @@ impl Widget for CentralPanel {
             ui.separator();
 
             draw_stream_controls(ui);
+            ui.separator();
+
+            CollapsingHeader::new("Magnitude colors")
+                .default_open(true)
+                .show(ui, |ui| {
+                    ui.group(|ui| {
+                        ui.with_layout(
+                            Layout::left_to_right(Align::Min)
+                                .with_main_align(Align::Min)
+                                .with_main_justify(true),
+                            |ui| {
+                                ui.label("min");
+                                ui.label("max");
+                            },
+                        );
+                        ui.add(RangeWidget::new_horizontal(self.heat_map));
+                    })
+                })
         };
 
         ui.horizontal_top(|ui| {
@@ -141,15 +176,141 @@ impl Widget for CentralPanel {
                 draw_parameters_and_control_panel,
             );
 
-            ui.add(Separator::default().vertical());
             add_columns(ui, 2, |ui| {
-                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 3.0), self.spectrum_left);
+                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 5.0), self.spectrum_left);
                 ui[0].add(self.spectrogram_left);
-                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 3.0), self.spectrum_right);
+
+                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 5.0), self.spectrum_right);
                 ui[1].add(self.spectrogram_right);
             });
             response
         })
         .response
+    }
+}
+
+#[derive(Clone)]
+pub struct HeatMapImage {
+    texture_horizontal: egui::TextureHandle,
+    texture_vertical: egui::TextureHandle,
+}
+
+impl HeatMapImage {
+    const RESOLUTION: usize = 1000;
+
+    pub fn new(ctx: &Context) -> Self {
+        let mut srgba = vec![Color32::TRANSPARENT; 1000];
+        for i in (0..1000).rev() {
+            let value = i as f32 / 1000.0;
+            let color = Self::color_map(value);
+            srgba[i] = color;
+        }
+        let texture_vertical = ctx.load_texture(
+            "heat_map_vertical",
+            ImageData::Color(Arc::new(ColorImage {
+                size: [1, Self::RESOLUTION],
+                pixels: srgba.iter().rev().cloned().collect(),
+            })),
+            TextureOptions::LINEAR,
+        );
+        let texture_horizontal = ctx.load_texture(
+            "heat_map_horizontal",
+            ImageData::Color(Arc::new(ColorImage {
+                size: [Self::RESOLUTION, 1],
+                pixels: srgba,
+            })),
+            TextureOptions::LINEAR,
+        );
+
+        Self {
+            texture_horizontal,
+            texture_vertical,
+        }
+    }
+
+    fn mix(color1: Color32, color2: Color32, value: f32) -> Color32 {
+        let r = color1.r() as f32 * (1.0 - value) + color2.r() as f32 * value;
+        let g = color1.g() as f32 * (1.0 - value) + color2.g() as f32 * value;
+        let b = color1.b() as f32 * (1.0 - value) + color2.b() as f32 * value;
+        let a = color1.a() as f32 * (1.0 - value) + color2.a() as f32 * value;
+
+        Color32::from_rgba_premultiplied(r as u8, g as u8, b as u8, a as u8)
+    }
+
+    fn color_map(value: f32) -> Color32 {
+        let color1 = Color32::from_rgba_premultiplied(0, 0, 255, 0);
+        let color2 = Color32::from_rgba_premultiplied(0, 255, 255, 255);
+        let color3 = Color32::from_rgba_premultiplied(0, 255, 0, 255);
+        let color4 = Color32::from_rgba_premultiplied(255, 255, 0, 255);
+        let color5 = Color32::from_rgba_premultiplied(255, 0, 0, 255);
+
+        if value < 0.25 {
+            Self::mix(color1, color2, value * 4.0)
+        } else if value < 0.5 {
+            Self::mix(color2, color3, (value - 0.25) * 4.0)
+        } else if value < 0.75 {
+            Self::mix(color3, color4, (value - 0.5) * 4.0)
+        } else {
+            Self::mix(color4, color5, (value - 0.75) * 4.0)
+        }
+    }
+}
+
+enum RangeWidgetOrientation {
+    Vertical,
+    Horizontal,
+}
+
+struct RangeWidget {
+    heat_map: HeatMapImage,
+    orientation: RangeWidgetOrientation,
+}
+
+impl RangeWidget {
+    const THICKNESS: f32 = 10.0;
+
+    pub fn new_vertical(heat_map: HeatMapImage) -> Self {
+        Self {
+            heat_map,
+            orientation: RangeWidgetOrientation::Vertical,
+        }
+    }
+
+    pub fn new_horizontal(heat_map: HeatMapImage) -> Self {
+        Self {
+            heat_map,
+            orientation: RangeWidgetOrientation::Horizontal,
+        }
+    }
+}
+
+impl Widget for RangeWidget {
+    fn ui(self, ui: &mut egui::Ui) -> egui::Response {
+        match self.orientation {
+            RangeWidgetOrientation::Vertical => {
+                let response = ui.allocate_response(
+                    Vec2::new(Self::THICKNESS, ui.available_height()),
+                    Sense::click_and_drag(),
+                );
+                if ui.is_rect_visible(response.rect) {
+                    egui::Image::new(SizedTexture::from_handle(&self.heat_map.texture_vertical))
+                        .paint_at(ui, response.rect);
+                }
+
+                response
+            }
+            RangeWidgetOrientation::Horizontal => {
+                let response = ui.allocate_response(
+                    Vec2::new(ui.available_width(), Self::THICKNESS),
+                    Sense::click_and_drag(),
+                );
+                if ui.is_rect_visible(response.rect) {
+                    egui::Image::new(SizedTexture::from_handle(&self.heat_map.texture_horizontal))
+                        .paint_at(ui, response.rect);
+                }
+
+                response
+            }
+        }
     }
 }
