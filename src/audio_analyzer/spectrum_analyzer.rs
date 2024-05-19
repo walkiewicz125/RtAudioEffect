@@ -36,7 +36,7 @@ impl Window {
     }
 
     fn generate_hanning_window(width: usize) -> Vec<f32> {
-        apodize::hanning_iter(width)
+        apodize::nuttall_iter(width)
             .map(|v| v as f32)
             .collect::<Vec<f32>>()
     }

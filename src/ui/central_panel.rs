@@ -33,6 +33,7 @@ pub struct CentralPanel {
     spectrogram_right: SpectrogramRendererWidget,
     heat_map: HeatMapImage,
     auto_range: bool,
+    fps: f32,
 }
 
 impl CentralPanel {
@@ -45,6 +46,7 @@ impl CentralPanel {
         spectrogram_renderer_right: Arc<Mutex<SpectrogramRenderer>>,
         heat_map: HeatMapImage,
         auto_range: bool,
+        fps: f32,
     ) -> Self {
         Self {
             audio_analyzer,
@@ -63,6 +65,7 @@ impl CentralPanel {
             },
             heat_map,
             auto_range,
+            fps,
         }
     }
 }
@@ -163,7 +166,11 @@ impl Widget for CentralPanel {
                         );
                         ui.add(RangeWidget::new_horizontal(self.heat_map));
                     })
-                })
+                });
+            ui.with_layout(Layout::left_to_right(Align::Min), |ui| {
+                ui.label("FPS:");
+                ui.label(self.fps.to_string());
+            });
         };
 
         ui.horizontal_top(|ui| {
@@ -177,10 +184,10 @@ impl Widget for CentralPanel {
             );
 
             add_columns(ui, 2, |ui| {
-                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 5.0), self.spectrum_left);
+                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 3.0), self.spectrum_left);
                 ui[0].add(self.spectrogram_left);
 
-                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 5.0), self.spectrum_right);
+                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 3.0), self.spectrum_right);
                 ui[1].add(self.spectrogram_right);
             });
             response

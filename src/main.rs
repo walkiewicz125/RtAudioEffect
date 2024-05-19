@@ -103,7 +103,7 @@ impl AppContext {
             audio_stream.clone(),
             HeatMapImage::new(app_window.get_egui_context()),
         );
-        ui_controller.set_text_styles(&app_window.egui_context, 20.0);
+        ui_controller.set_text_styles(&app_window.egui_context, 15.0);
 
         AppContext {
             audio_stream,
@@ -124,7 +124,18 @@ impl AppContext {
 
         self.audio_stream.lock().unwrap().start();
 
+        let mut last_time = std::time::Instant::now();
+        let mut elapsed_time = std::time::Duration::from_secs_f32(0.0);
+        let mut filtered_elapsed_time = std::time::Duration::from_secs_f32(0.0);
+
         while !self.app_window.window.should_close() {
+            elapsed_time = last_time.elapsed();
+            last_time = std::time::Instant::now();
+
+            filtered_elapsed_time =
+                filtered_elapsed_time.mul_f32(0.98) + elapsed_time.mul_f32(0.02);
+            let fps = 1.0 / filtered_elapsed_time.as_secs_f32();
+
             self.app_window.begin_frame();
 
             let egui_context = self.app_window.get_egui_context();
@@ -132,7 +143,7 @@ impl AppContext {
             self.ui_controller.update_data();
 
             egui::CentralPanel::default().show(&egui_context, |ui| {
-                ui.add(self.ui_controller.get_central_panel());
+                ui.add(self.ui_controller.get_central_panel(fps));
             });
 
             self.app_window.end_frame();

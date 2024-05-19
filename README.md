@@ -2,6 +2,9 @@ Current view of application.
 <!-- insert window.png -->
 ![image](window.png)
 
+"demo":
+https://www.youtube.com/watch?v=csQiFaLMgIg
+
 
 ## Realy short status
 ### Current functionality:

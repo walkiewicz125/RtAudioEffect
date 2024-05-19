@@ -110,6 +110,7 @@ impl SpectrogramRenderer {
             .bind(Self::SPECTROGRAM_DATA_BINDING_POINT);
 
         unsafe {
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             gl::DrawArraysInstanced(
                 gl::TRIANGLE_STRIP,
                 0,

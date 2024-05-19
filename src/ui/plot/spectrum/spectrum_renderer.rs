@@ -15,6 +15,11 @@ pub struct SpectrumRenderer {
     view_matrix: UniformBuffer,
     min_max: UniformBuffer,
     storage_buffer: StorageBufferArray<f32>,
+    storage_buffer2: StorageBufferArray<f32>,
+    storage_buffer3: StorageBufferArray<f32>,
+    spectrum: Vec<f32>,
+    mean_spectrum: Vec<f32>,
+    mean_old_spectrum: Vec<f32>,
 }
 impl SpectrumRenderer {
     const VERTEX_SHADER: &'static str = include_str!("../resources/barplot.vert");
@@ -33,6 +38,8 @@ impl SpectrumRenderer {
         let view_matrix = UniformBuffer::new_for::<Mat4>();
         let min_max = UniformBuffer::new_for::<Vec2>();
         let storage_buffer = StorageBufferArray::new();
+        let storage_buffer2 = StorageBufferArray::new();
+        let storage_buffer3 = StorageBufferArray::new();
 
         Self {
             shader,
@@ -41,16 +48,43 @@ impl SpectrumRenderer {
             view_matrix,
             min_max,
             storage_buffer,
+            storage_buffer2,
+            storage_buffer3,
+            spectrum: Vec::new(),
+            mean_spectrum: Vec::new(),
+            mean_old_spectrum: Vec::new(),
         }
     }
 
     pub fn set_spectrum(&mut self, spectrum: &[f32]) {
-        let min = spectrum.into_iter().cloned().reduce(f32::min).unwrap();
-        let max = spectrum.into_iter().cloned().reduce(f32::max).unwrap();
-
-        self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
+        self.spectrum = spectrum.to_vec();
+        if self.mean_spectrum.is_empty() || self.mean_old_spectrum.is_empty() {
+            self.mean_spectrum = spectrum.to_vec();
+            self.mean_old_spectrum = spectrum.to_vec();
+        } else {
+            self.mean_spectrum = self
+                .mean_spectrum
+                .iter()
+                .zip(spectrum.iter())
+                .map(|(a, b)| a * 0.9 + b * 0.1)
+                .collect();
+            self.mean_old_spectrum = self
+                .mean_old_spectrum
+                .iter()
+                .zip(spectrum.iter())
+                .map(|(a, b)| {
+                    if b > a {
+                        return *b;
+                    } else {
+                        return a * 0.95;
+                    }
+                })
+                .collect();
+        }
 
         self.storage_buffer.store_array(spectrum);
+        self.storage_buffer2.store_array(&self.mean_spectrum);
+        self.storage_buffer3.store_array(&self.mean_old_spectrum);
     }
 
     pub fn set_render_size(&mut self, size: (u32, u32)) {
@@ -62,22 +96,69 @@ impl SpectrumRenderer {
         self.view_matrix.buffer_subdata(&view_matrix, 0);
     }
 
-    pub fn render(&self) {
+    pub fn render(&mut self) {
         self.shader.enable();
         self.vertex_array.bind();
 
-        self.storage_buffer
-            .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
-
         self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
         self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
-        self.min_max.bind(Self::MIN_MAX_BINDING_POINT);
 
+        // render current spectrum
+        let min = self.spectrum.iter().cloned().reduce(f32::min).unwrap();
+        let max = self.spectrum.iter().cloned().reduce(f32::max).unwrap();
+        self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
+        self.storage_buffer
+            .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
+        self.min_max.bind(Self::MIN_MAX_BINDING_POINT);
         unsafe {
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             gl::DrawArrays(
                 gl::TRIANGLES,
                 0,
                 Self::VERTICES_COUNT * self.storage_buffer.len(),
+            );
+        }
+
+        // render mean spectrum
+        let min = self.mean_spectrum.iter().cloned().reduce(f32::min).unwrap();
+        let max = self.mean_spectrum.iter().cloned().reduce(f32::max).unwrap();
+        self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
+        self.storage_buffer2
+            .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
+        self.min_max.bind(Self::MIN_MAX_BINDING_POINT);
+        unsafe {
+            gl::BlendColor(0.01, 0.5, 0.01, 0.05);
+            gl::BlendFunc(gl::CONSTANT_COLOR, gl::DST_ALPHA);
+            gl::DrawArrays(
+                gl::TRIANGLES,
+                0,
+                Self::VERTICES_COUNT * self.storage_buffer2.len(),
+            );
+        }
+        // render mean old spectrum
+        let min = self
+            .mean_old_spectrum
+            .iter()
+            .cloned()
+            .reduce(f32::min)
+            .unwrap();
+        let max = self
+            .mean_old_spectrum
+            .iter()
+            .cloned()
+            .reduce(f32::max)
+            .unwrap();
+        self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
+        self.storage_buffer3
+            .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
+        self.min_max.bind(Self::MIN_MAX_BINDING_POINT);
+        unsafe {
+            gl::BlendColor(1.0, 0.0, 0.0, 0.05);
+            gl::BlendFunc(gl::CONSTANT_COLOR, gl::DST_ALPHA);
+            gl::DrawArrays(
+                gl::TRIANGLES,
+                0,
+                Self::VERTICES_COUNT * self.storage_buffer3.len(),
             );
         }
 

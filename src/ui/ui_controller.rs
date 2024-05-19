@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use egui::{FontId, TextStyle, TextureId};
+use egui::{FontData, FontDefinitions, FontFamily, FontId, TextStyle, TextureId};
 
 use crate::{audio::audio_stream::AudioStream, audio_analyzer::AudioAnalyzysProvider};
 
@@ -64,7 +64,7 @@ impl UiController {
         );
     }
 
-    pub fn get_central_panel(&self) -> CentralPanel {
+    pub fn get_central_panel(&self, fps: f32) -> CentralPanel {
         CentralPanel::build(
             self.audio_analyzer.clone(),
             self.audio_stream.clone(),
@@ -74,10 +74,28 @@ impl UiController {
             self.spectrogram_renderer_right.clone(),
             self.heat_map.clone(),
             self.auto_range,
+            fps,
         )
     }
 
     pub fn set_text_styles(&self, egui_context: &egui::Context, font_size: f32) {
+        let mut fonts = FontDefinitions::default();
+
+        // Install my own font (maybe supporting non-latin characters):
+        fonts.font_data.insert(
+            "DejaVuSans".to_owned(),
+            FontData::from_static(include_bytes!("fonts/DejaVuSans.ttf")),
+        ); // .ttf and .otf supported
+
+        // Put my font first (highest priority):
+        fonts
+            .families
+            .get_mut(&FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "DejaVuSans".to_owned());
+
+        egui_context.set_fonts(fonts);
+
         egui_context.style_mut(|x| {
             x.text_styles.insert(
                 TextStyle::Body,
