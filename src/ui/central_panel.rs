@@ -184,10 +184,10 @@ impl Widget for CentralPanel {
             );
 
             add_columns(ui, 2, |ui| {
-                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 3.0), self.spectrum_left);
+                ui[0].add_sized(ui[0].available_size() / vec2(1.0, 2.0), self.spectrum_left);
                 ui[0].add(self.spectrogram_left);
 
-                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 3.0), self.spectrum_right);
+                ui[1].add_sized(ui[1].available_size() / vec2(1.0, 2.0), self.spectrum_right);
                 ui[1].add(self.spectrogram_right);
             });
             response
