@@ -12,7 +12,7 @@ C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/moni
 C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/flash.dir
 C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/encrypted-flash.dir
 C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/_project_elf_src.dir
-C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/hello_world.elf.dir
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/RtAudioEffect.elf.dir
 C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/size.dir
 C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/size-files.dir
 C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/size-components.dir

@@ -1,15 +1,15 @@
 {
     "version":            "1.1",
-    "project_name":       "hello_world",
-    "project_version":    "Milestone5-34-ge3dc19c",
+    "project_name":       "RtAudioEffect",
+    "project_version":    "Milestone5-36-gb19e9b8-dirty",
     "project_path":       "C:/programming/projects/rust/rt_audio_efect/esp_head_light",
     "idf_path":           "C:/Users/proxima/esp/v5.3/esp-idf",
     "build_dir":          "C:/programming/projects/rust/rt_audio_efect/esp_head_light/build",
     "config_file":        "C:/programming/projects/rust/rt_audio_efect/esp_head_light/sdkconfig",
     "config_defaults":    "",
     "bootloader_elf":     "C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader/bootloader.elf",
-    "app_elf":            "hello_world.elf",
-    "app_bin":            "hello_world.bin",
+    "app_elf":            "RtAudioEffect.elf",
+    "app_bin":            "RtAudioEffect.bin",
     "build_type":         "flash_app",
     "git_revision":       "v5.3-dev-3675-ge486f3b944",
     "target":             "esp32c3",
@@ -1165,7 +1165,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__mdns" ],
             "file": "C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/esp-idf/main/libmain.a",
-            "sources": [ "C:/programming/projects/rust/rt_audio_efect/esp_head_light/main/hello_world_main.c" ],
+            "sources": [ "C:/programming/projects/rust/rt_audio_efect/esp_head_light/main/main.c" ],
             "include_dirs": []
         },
         "mbedtls": {
