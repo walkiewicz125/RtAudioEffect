@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/bootloader
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/bootloader.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/CMakeFiles/bootloader-complete.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+C:/programming/projects/rust/rt_audio_efect/esp_head_light/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
