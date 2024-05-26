@@ -111,7 +111,6 @@ impl AppContext {
         });
 
         let connection = self.service.wait_for_client();
-        
 
         self.audio_stream.lock().unwrap().start();
 
