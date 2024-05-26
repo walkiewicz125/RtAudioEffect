@@ -21,7 +21,8 @@ use std::{
 use crate::{
     audio::{audio_stream::AudioStream, AudioManager, AudioStreamConsumer},
     audio_analyzer::StreamAnalyzer,
-    server::{Service, ServiceRegister},
+    server::ServiceRegister,
+    server::{Service, ServiceClient},
     ui::ui_controller::UiController,
 };
 

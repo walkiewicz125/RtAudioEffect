@@ -11,6 +11,8 @@ pub struct ServiceClient {
     pub addr: SocketAddr,
 }
 
+
+
 impl ServiceClient {
     fn new(connection: (TcpStream, SocketAddr)) -> Self {
         info!("Client connected from: {}", connection.1);
@@ -19,6 +21,8 @@ impl ServiceClient {
             addr: connection.1,
         }
     }
+
+    fn send_message(&mut self, message: &str) {}
 }
 
 pub struct Service {
