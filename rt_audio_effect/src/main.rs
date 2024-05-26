@@ -8,8 +8,7 @@ use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use ui::central_panel::HeatMapImage;
-mod server;
+use service::Service;
 use std::{
     io::{BufRead, BufReader},
     net::TcpStream,
@@ -17,18 +16,22 @@ use std::{
     thread,
     time::Duration,
 };
+use ui::central_panel::HeatMapImage;
 
 use crate::{
     audio::{audio_stream::AudioStream, AudioManager, AudioStreamConsumer},
     audio_analyzer::StreamAnalyzer,
-    server::ServiceRegister,
-    server::{Service, ServiceClient},
+    messages::Message,
+    service::ServiceRegister,
     ui::ui_controller::UiController,
 };
 
+mod service;
+
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
-
+extern crate serializer;
+pub mod messages;
 fn main() {
     info!("Hello RtAudioEffect!");
 
@@ -57,16 +60,7 @@ struct AppContext {
     ui_controller: UiController,
     service: Arc<Service>,
 }
-fn handle_connection(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&mut stream);
-    let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
 
-    println!("Request: {:#?}", http_request);
-}
 impl AppContext {
     fn new(service: Arc<Service>) -> AppContext {
         let audio_stream = Arc::new(Mutex::new(
@@ -111,7 +105,10 @@ impl AppContext {
             }
         });
 
-        let connection = self.service.wait_for_client();
+        let mut connection = self.service.wait_for_client();
+
+        let msg: Message = connection.recv_message().into();
+        println!("Received: {:#?}", msg);
 
         self.audio_stream.lock().unwrap().start();
 

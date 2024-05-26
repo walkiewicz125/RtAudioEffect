@@ -138,15 +138,9 @@ void mdns_print_results(mdns_result_t *results)
                     if (err == ERR_OK)
                     {
                         printf("Connected to %s:%d\n", ip4addr_ntoa(&a->addr.u_addr.ip4), r->port);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
-                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        char ech_msg[] = "\x00\x00\x00\x00\x05\x00\x00\x00hello";
+                        netconn_write(conn, ech_msg, sizeof(ech_msg), NETCONN_COPY);
+
                         netconn_close(conn);
                         netconn_delete(conn);
                     }
@@ -221,6 +215,8 @@ void app_main(void)
            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
     esp_netif_t *wifi = esp_netif_create_default_wifi_sta();
+
+    esp_netif_set_hostname(wifi, "RtAudioEffectHeadLight");
     wifi_init_config_t wifi_initialization = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_initialization));
     esp_event_handler_instance_t instance_any_id;
@@ -257,7 +253,9 @@ void app_main(void)
     {
         ESP_LOGE("MAIN_WIFI", "UNEXPECTED EVENT");
     }
+
     mdns_init();
+
     printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
     for (int i = 10; i >= 0; i--)
     {

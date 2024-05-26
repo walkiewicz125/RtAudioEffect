@@ -19,7 +19,7 @@ log = "0.4.*"
 colored = "2.1.*"
 glamour = "0.11.*"
 mdns-sd = "0.11.*"
-serializer_macro = { path = "serializer_macro" }
+serializer = { path = "serializer" }
 
 [dependencies.clipboard]
 package = "cli-clipboard"
