@@ -1,18 +1,18 @@
 mod audio;
 mod audio_analyzer;
-mod audio_annotator;
 mod logger;
 mod ui;
 
 use audio_analyzer::{ManyChannelsSpectrums, StreamAnalyzerReceiver};
-use audio_annotator::StreamAnalyzerAnnotator;
 use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 use ui::central_panel::HeatMapImage;
-
+mod server;
 use std::{
+    io::{BufRead, BufReader},
+    net::TcpStream,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -21,6 +21,7 @@ use std::{
 use crate::{
     audio::{audio_stream::AudioStream, AudioManager, AudioStreamConsumer},
     audio_analyzer::StreamAnalyzer,
+    server::{Service, ServiceRegister},
     ui::ui_controller::UiController,
 };
 
@@ -31,27 +32,15 @@ fn main() {
     info!("Hello RtAudioEffect!");
 
     if let Err(err) =
-        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
     {
         eprintln!("log::set_logger failed: {err:#?}");
     }
 
-    let mdns = ServiceDaemon::new().expect("Failed to create mDNS daemon");
-    let rt_audio_efect_service = ServiceInfo::new(
-        "_RtAudioEffect._udp.local.",
-        "RtAudioEffect",
-        "RtAudioEffect.local.",
-        "127.0.0.1",
-        12337,
-        None,
-    )
-    .unwrap()
-    .enable_addr_auto();
+    let mut service_register = ServiceRegister::new();
+    let service = service_register.add_service("RtAudioEffect");
 
-    mdns.register(rt_audio_efect_service)
-        .expect("Failed to register RtAudioEffect service in mDNS deamon");
-
-    let mut context = AppContext::new();
+    let mut context = AppContext::new(service);
 
     if context.run() {
         info!("RtAudioEffect exit successfully");
@@ -63,13 +52,22 @@ fn main() {
 struct AppContext {
     audio_stream: Arc<Mutex<AudioStream>>,
     analyzer: Arc<Mutex<StreamAnalyzer>>,
-    annotator: Arc<Mutex<StreamAnalyzerAnnotator>>,
     app_window: AppWindow,
     ui_controller: UiController,
+    service: Arc<Service>,
 }
+fn handle_connection(mut stream: TcpStream) {
+    let buf_reader = BufReader::new(&mut stream);
+    let http_request: Vec<_> = buf_reader
+        .lines()
+        .map(|result| result.unwrap())
+        .take_while(|line| !line.is_empty())
+        .collect();
 
+    println!("Request: {:#?}", http_request);
+}
 impl AppContext {
-    fn new() -> AppContext {
+    fn new(service: Arc<Service>) -> AppContext {
         let audio_stream = Arc::new(Mutex::new(
             AudioStream::new(AudioManager::get_default_loopback().unwrap()).unwrap(),
         ));
@@ -80,16 +78,6 @@ impl AppContext {
             4800,
             audio_stream.lock().unwrap().get_parameters(),
         )));
-        let annotator = Arc::new(Mutex::new(StreamAnalyzerAnnotator::new(
-            analyzer.lock().unwrap().get_analyzer_parameters(),
-            Duration::from_secs_f32(1.0),
-            audio_stream.lock().unwrap().get_parameters().channels as usize,
-        )));
-
-        analyzer
-            .lock()
-            .unwrap()
-            .register_receiver(annotator.clone());
 
         audio_stream
             .lock()
@@ -108,9 +96,9 @@ impl AppContext {
         AppContext {
             audio_stream,
             analyzer,
-            annotator,
             app_window,
             ui_controller,
+            service,
         }
     }
 
@@ -121,6 +109,9 @@ impl AppContext {
                 analyzer_clone.lock().unwrap().process_new_samples();
             }
         });
+
+        let connection = self.service.wait_for_client();
+        
 
         self.audio_stream.lock().unwrap().start();
 

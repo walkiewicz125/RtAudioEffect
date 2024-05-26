@@ -21,6 +21,7 @@
     "esp_netif.h": "c",
     "esp_netif_types.h": "c",
     "esp_log.h": "c",
-    "esp_netif_private.h": "c"
+    "esp_netif_private.h": "c",
+    "api.h": "c"
   }
 }

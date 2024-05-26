@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "RtAudioEffect",
-    "project_version":    "Milestone5-36-gb19e9b8-dirty",
+    "project_version":    "Milestone5-37-gdc02a08-dirty",
     "project_path":       "C:/programming/projects/rust/rt_audio_efect/esp_head_light",
     "idf_path":           "C:/Users/proxima/esp/v5.3/esp-idf",
     "build_dir":          "C:/programming/projects/rust/rt_audio_efect/esp_head_light/build",

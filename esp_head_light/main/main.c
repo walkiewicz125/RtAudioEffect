@@ -21,6 +21,13 @@
 #include "lwip/sys.h"
 #include "lwip/udp.h"
 #include "mdns.h"
+#include "lwip/opt.h"
+#include "lwip/arch.h"
+#include "lwip/netbuf.h"
+#include "lwip/sys.h"
+#include "lwip/ip_addr.h"
+#include "lwip/err.h"
+#include "lwip/api.h"
 
 void resolve_mdns_host(const char *host_name)
 {
@@ -124,36 +131,33 @@ void mdns_print_results(mdns_result_t *results)
                 // addr.sin_port = htons(r->port);
                 // udp_sendto(udp_sock, "Hello", 5, (struct sockaddr *)&addr, r->port);
 
-                int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-                if (sock < 0)
+                struct netconn_t *conn = netconn_new(NETCONN_TCP);
+                if (conn != NULL)
                 {
-                    printf("Error creating socket\n");
-                    return;
-                }
-                struct sockaddr_in addr;
-                addr.sin_addr.s_addr = a->addr.u_addr.ip4.addr;
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(r->port);
-                int ret = sendto(sock, "Hello", 5, 0, (struct sockaddr *)&addr, sizeof(addr));
-                if (ret < 0)
-                {
-                    printf("Error sending data\n");
-                    return;
-                }
-                else
-                {
-                    printf("Data sent: %d\n", ret);
-                }
-                char buff[1024];
-                int ret2 = recvfrom(sock, buff, 1024, 0, (struct sockaddr *)&addr, 0);
-                if (ret2 < 0)
-                {
-                    printf("Error receiving data\n");
-                    return;
+                    err_t err = netconn_connect(conn, &a->addr.u_addr.ip4, r->port);
+                    if (err == ERR_OK)
+                    {
+                        printf("Connected to %s:%d\n", ip4addr_ntoa(&a->addr.u_addr.ip4), r->port);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_write(conn, "Hello", 5, NETCONN_COPY);
+                        netconn_close(conn);
+                        netconn_delete(conn);
+                    }
+                    else
+                    {
+                        printf("Connection failed\n");
+                    }
                 }
                 else
                 {
-                    printf("Data received: %d [%s]\n", ret2, buff);
+                    printf("Failed to create new connection\n");
                 }
             }
             a = a->next;
@@ -188,7 +192,6 @@ void app_main(void)
 {
     printf("Hello world!\n");
     ESP_ERROR_CHECK(nvs_flash_init());
-
     s_wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -266,7 +269,7 @@ void app_main(void)
         // resolve_mdns_host("_RtAudioEffect._udp.local");
         // resolve_mdns_host("_RtAudioEffect._udp.local.");
 
-        find_mdns_service("_RtAudioEffect", "_udp");
+        find_mdns_service("_RtAudioEffect", "_tcp");
         printf("Restarting in %d seconds...\n", i);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
