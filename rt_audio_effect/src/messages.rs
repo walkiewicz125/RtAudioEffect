@@ -8,10 +8,16 @@ pub struct EchoMessage {
     pub message: String,
 }
 
-#[derive(Debug)]
+#[derive(Serializable, Debug)]
 pub enum Message {
     Invalid,
     Echo(EchoMessage),
+}
+
+impl Default for Message {
+    fn default() -> Self {
+        Message::Invalid
+    }
 }
 
 impl Into<Message> for MessageFrame {
