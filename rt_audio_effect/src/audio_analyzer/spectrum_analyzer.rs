@@ -82,7 +82,7 @@ impl SpectrumAnalyzer {
             .map(|number| number.norm() / self.window.sum_window)
             .take(self.spectrum_width / 2)
             .collect();
-        spectrum[0] = 0.0;
+        spectrum[0] = 0.0; // TODO: keep?
 
         spectrum
     }
