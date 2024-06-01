@@ -1,6 +1,5 @@
 use std::{
     sync::{Arc, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -9,18 +8,17 @@ use log::{info, trace};
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
 use super::{
-    AnalyzerParameters, Magnitude, ManyChannelsSpectrums, MultiChannel, Spectrogram, Spectrum,
-    SpectrumAnalyzer, TimeSeries,
+    AnalyzerParameters, FftAnalyzer, Magnitude, MultiChannel, Spectrogram, Spectrum, TimeSeries,
 };
 
 pub trait StreamAnalyzerReceiver: Send {
-    fn receive(&mut self, spectrums: &ManyChannelsSpectrums);
+    fn receive(&mut self, spectrums: &MultiChannel<Spectrum>);
 }
 
 pub struct StreamAnalyzer {
     audio_buffer: Arc<Mutex<AudioBuffer>>,
     analyzer_parameters: Arc<AnalyzerParameters>,
-    spectrum_analyzer: SpectrumAnalyzer,
+    spectrum_analyzer: FftAnalyzer,
     spectrogram: Spectrogram,
     receivers: Vec<Arc<Mutex<dyn StreamAnalyzerReceiver>>>,
     is_alive: bool,
@@ -28,7 +26,7 @@ pub struct StreamAnalyzer {
 
 pub trait AudioAnalyzysProvider {
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
-    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
+    fn get_latest_spectrum(&self) -> MultiChannel<Spectrum>;
     fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32));
 }
 
@@ -49,16 +47,16 @@ impl AudioStreamConsumer for StreamAnalyzer {
                     total_sample_count,
                     new_samples
                 );
-                let mut spectrums = vec![];
-                for (channel, samples) in new_multichannel_samples.iter().enumerate() {
+                let mut spectrums: Vec<Spectrum> = vec![];
+                for (channel, samples) in new_multichannel_samples.into_iter().enumerate() {
                     trace!("Processing samples for channel: {}", channel);
                     spectrums.push(self.spectrum_analyzer.analyze(&samples));
                 }
 
-                self.spectrogram.push_spectrums(spectrums.clone());
+                self.spectrogram.push_spectrums(spectrums.clone().into());
 
                 for receiver in self.receivers.iter() {
-                    receiver.lock().unwrap().receive(&spectrums);
+                    receiver.lock().unwrap().receive(&spectrums.clone().into());
                 }
             }
         }
@@ -78,7 +76,7 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
         self.get_analyzer_parameters()
     }
 
-    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
+    fn get_latest_spectrum(&self) -> MultiChannel<Spectrum> {
         self.spectrogram.get_latest_spectrum()
     }
 
@@ -117,7 +115,7 @@ impl StreamAnalyzer {
                 buffer_duration,
             ))),
             analyzer_parameters: parameters.clone(),
-            spectrum_analyzer: SpectrumAnalyzer::new(
+            spectrum_analyzer: FftAnalyzer::new(
                 spectrum_width,
                 stream_parameters.sample_rate as usize,
             ),

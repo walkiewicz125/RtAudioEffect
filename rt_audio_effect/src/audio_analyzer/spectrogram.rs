@@ -2,81 +2,12 @@ use std::sync::Arc;
 
 use crate::audio::StreamParameters;
 
-use super::{AnalyzerParameters, ManyChannelsSpectrums, Spectrum};
+use super::{AnalyzerParameters, MultiChannel, Spectrum, TimeSeries};
 
 pub type Magnitude = f32;
 
-#[derive(Clone)]
-pub struct TimeSeries<T> {
-    data: Vec<T>,
-    length: usize,
-    width: usize,
-    total_size: usize,
-}
-
-impl<T> TimeSeries<T>
-where
-    T: Clone,
-{
-    pub fn new(length: usize, width: usize, default_value: T) -> TimeSeries<T> {
-        TimeSeries {
-            data: vec![default_value; length * width],
-            length: length,
-            width: width,
-            total_size: length * width,
-        }
-    }
-
-    pub fn push(&mut self, data: Vec<T>) {
-        self.data.extend(data);
-
-        if self.data.len() >= self.length * self.width {
-            self.data.drain(0..self.data.len() - self.total_size);
-        }
-    }
-
-    pub fn get_total_len(&self) -> usize {
-        self.total_size
-    }
-
-    pub fn get_length(&self) -> usize {
-        self.length
-    }
-
-    pub fn get_width(&self) -> usize {
-        self.width
-    }
-
-    pub fn get_last(&self) -> &[T] {
-        &self.data[self.data.len() - self.width..]
-    }
-    pub fn get_data(&self) -> &[T] {
-        self.data.as_slice()
-    }
-}
-
-pub struct MultiChannel<T> {
-    pub channels: Vec<T>,
-}
-
-impl<T> MultiChannel<T>
-where
-    T: Clone,
-{
-    pub fn new(channel_count: usize, default_value: T) -> MultiChannel<T> {
-        MultiChannel {
-            channels: vec![default_value; channel_count],
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.channels.len()
-    }
-}
-
 pub struct Spectrogram {
     stream_parameters: Arc<StreamParameters>,
-    analyzer_parameters: Arc<AnalyzerParameters>,
     spectrum_history: MultiChannel<TimeSeries<Magnitude>>,
 }
 
@@ -87,7 +18,6 @@ impl Spectrogram {
     ) -> Spectrogram {
         Spectrogram {
             stream_parameters: stream_parameters.clone(),
-            analyzer_parameters: analyzer_parameters.clone(),
             spectrum_history: MultiChannel::new(
                 stream_parameters.channels as usize,
                 TimeSeries::new(
@@ -99,23 +29,21 @@ impl Spectrogram {
         }
     }
 
-    pub fn push_spectrums(&mut self, spectrums: ManyChannelsSpectrums) {
+    pub fn push_spectrums(&mut self, spectrums: MultiChannel<Spectrum>) {
         assert!(spectrums.len() == self.stream_parameters.channels as usize);
         assert!(spectrums.len() == self.spectrum_history.len());
 
         spectrums.into_iter().enumerate().for_each(|(i, data)| {
-            self.spectrum_history.channels[i].push(data);
+            self.spectrum_history.channels[i].push(data.into());
         });
     }
 
-    pub fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
-        let mut spectrums = vec![];
-
+    pub fn get_latest_spectrum(&self) -> MultiChannel<Spectrum> {
+        let mut spectrums: Vec<Spectrum> = vec![];
         self.spectrum_history.channels.iter().for_each(|channel| {
-            spectrums.push(channel.get_last().to_vec());
+            spectrums.push(channel.get_last().into());
         });
-
-        spectrums
+        spectrums.into()
     }
 
     pub fn get_spectrogram_for_channel(

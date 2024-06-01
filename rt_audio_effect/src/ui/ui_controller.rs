@@ -41,14 +41,21 @@ impl UiController {
     }
 
     pub fn update_data(&self) {
-        self.spectrum_renderer_left
-            .lock()
-            .unwrap()
-            .set_spectrum(&self.audio_analyzer.lock().unwrap().get_latest_spectrum()[0]);
-        self.spectrum_renderer_right
-            .lock()
-            .unwrap()
-            .set_spectrum(&self.audio_analyzer.lock().unwrap().get_latest_spectrum()[1]);
+        self.spectrum_renderer_left.lock().unwrap().set_spectrum(
+            self.audio_analyzer
+                .lock()
+                .unwrap()
+                .get_latest_spectrum()
+                .get_channel(0),
+        );
+        self.spectrum_renderer_right.lock().unwrap().set_spectrum(
+            &self
+                .audio_analyzer
+                .lock()
+                .unwrap()
+                .get_latest_spectrum()
+                .get_channel(1),
+        );
 
         self.spectrogram_renderer_left.lock().unwrap().buffer_data(
             self.audio_analyzer

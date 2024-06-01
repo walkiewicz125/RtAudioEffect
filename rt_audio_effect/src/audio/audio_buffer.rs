@@ -1,18 +1,63 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    ops::{Index, IndexMut},
+    sync::Arc,
+    time::Duration,
+};
 
 use log::{trace, warn};
+
+use crate::audio_analyzer::MultiChannel;
 
 use super::StreamParameters;
 
 pub type Sample = f32;
-pub type MixedChannelsSamples = Vec<Sample>;
-pub type OneChannelSamples = Vec<Sample>;
-pub type ManyChannelsSamples = Vec<OneChannelSamples>;
 
+pub struct MixedChannelsSamples(Vec<Sample>);
+impl MixedChannelsSamples {
+    pub fn inner(&self) -> &Vec<Sample> {
+        &self.0
+    }
+}
+
+impl From<Vec<Sample>> for MixedChannelsSamples {
+    fn from(samples: Vec<Sample>) -> Self {
+        MixedChannelsSamples(samples)
+    }
+}
+#[derive(Clone)]
+pub struct ChannelSamples(Vec<Sample>);
+impl ChannelSamples {
+    pub fn inner_mut(&mut self) -> &mut Vec<Sample> {
+        &mut self.0
+    }
+
+    pub fn inner(&self) -> &Vec<Sample> {
+        &self.0
+    }
+}
+
+impl From<Vec<Sample>> for ChannelSamples {
+    fn from(samples: Vec<Sample>) -> Self {
+        ChannelSamples(samples)
+    }
+}
+impl Index<usize> for ChannelSamples {
+    type Output = f32;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for ChannelSamples {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
 pub struct AudioBuffer {
     channels: u16,
     buffer_duration_in_samples: usize,
-    channels_buffers: ManyChannelsSamples,
+    channels_buffers: MultiChannel<ChannelSamples>,
     new_samples_count: usize,
 }
 
@@ -21,12 +66,14 @@ impl AudioBuffer {
         let buffer_duration_in_samples =
             (stream_parameters.sample_rate as f32 * buffer_duration.as_secs_f32()) as usize;
 
-        let empty_channels_buffers =
-            vec![vec![0.0; buffer_duration_in_samples]; stream_parameters.channels as usize];
+        let empty_channels_buffers = MultiChannel::new(
+            stream_parameters.channels as usize,
+            ChannelSamples::from(vec![0.0; buffer_duration_in_samples]),
+        );
         AudioBuffer {
             channels: stream_parameters.channels,
             buffer_duration_in_samples,
-            channels_buffers: empty_channels_buffers,
+            channels_buffers: empty_channels_buffers.into(),
             new_samples_count: 0,
         }
     }
@@ -52,7 +99,7 @@ impl AudioBuffer {
         &mut self,
         new_samples: usize,
         total_sample_count: usize,
-    ) -> Result<ManyChannelsSamples, String> {
+    ) -> Result<MultiChannel<ChannelSamples>, String> {
         trace!("Getting {total_sample_count} for all channels, with new samples: {new_samples}");
 
         assert!(
@@ -74,43 +121,46 @@ impl AudioBuffer {
                 + new_samples;
         let end_index = start_index + total_sample_count;
 
-        let mut channels_samples: ManyChannelsSamples = ManyChannelsSamples::default();
+        let mut channels_samples: Vec<ChannelSamples> = Vec::new();
 
-        for channel_samples in &self.channels_buffers {
-            let samples = channel_samples[start_index..end_index].to_vec();
-            channels_samples.push(samples);
+        for channel_samples in self.channels_buffers.inner_mut() {
+            let samples = channel_samples.inner_mut()[start_index..end_index].to_vec();
+            channels_samples.push(samples.into());
         }
 
         self.new_samples_count -= new_samples;
 
-        Ok(channels_samples)
+        Ok(channels_samples.into())
     }
 
     fn trim_buffers(&mut self) {
-        for (channel, buffer) in self.channels_buffers.iter_mut().enumerate() {
-            if buffer.len() > self.buffer_duration_in_samples {
-                let oversize = buffer.len() - self.buffer_duration_in_samples;
-                buffer.drain(0..oversize);
+        for (channel, buffer) in self.channels_buffers.inner_mut().iter_mut().enumerate() {
+            if buffer.inner_mut().len() > self.buffer_duration_in_samples {
+                let oversize = buffer.inner_mut().len() - self.buffer_duration_in_samples;
+                buffer.inner_mut().drain(0..oversize);
                 trace!("Trimming buffer[{channel}] by {oversize}");
             }
             assert!(
-                buffer.len() <= self.buffer_duration_in_samples,
+                buffer.inner_mut().len() <= self.buffer_duration_in_samples,
                 "buffer {channel} didn't shrink"
             );
         }
     }
 
     fn distribute_into_channels(&mut self, data: MixedChannelsSamples) -> usize {
-        let new_samples_per_channel = data.len() / self.channels as usize;
+        let new_samples_per_channel = data.inner().len() / self.channels as usize;
         trace!(
             "Distributing samples into separate channels. Channel count {}, new sample count per channel {}",
             self.channels,
             new_samples_per_channel
         );
 
-        for (sample_number, sample) in data.into_iter().enumerate() {
+        for (sample_number, sample) in data.inner().into_iter().enumerate() {
             let channel = sample_number % self.channels as usize;
-            self.channels_buffers[channel].push(sample);
+            self.channels_buffers
+                .get_channel_mut(channel)
+                .inner_mut()
+                .push(*sample);
         }
 
         new_samples_per_channel

@@ -3,7 +3,7 @@ mod audio_analyzer;
 mod logger;
 mod ui;
 
-use audio_analyzer::{ManyChannelsSpectrums, StreamAnalyzerReceiver};
+use audio_analyzer::StreamAnalyzerReceiver;
 use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
@@ -32,6 +32,7 @@ const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
 extern crate serializer;
 pub mod messages;
+
 fn main() {
     info!("Hello RtAudioEffect!");
 
@@ -105,10 +106,10 @@ impl AppContext {
             }
         });
 
-        let mut connection = self.service.wait_for_client();
+        // let mut connection = self.service.wait_for_client();
 
-        let msg: Message = connection.recv_message().into();
-        println!("Received: {:#?}", msg);
+        // let msg: Message = connection.recv_message().into();
+        // println!("Received: {:#?}", msg);
 
         self.audio_stream.lock().unwrap().start();
 

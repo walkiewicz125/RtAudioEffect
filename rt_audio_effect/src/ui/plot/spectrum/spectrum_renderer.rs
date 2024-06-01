@@ -1,11 +1,14 @@
 use glam::{Mat4, Vec2};
 use glamour::Matrix4;
 
-use crate::ui::plot::details::{
-    shader_program::ShaderProgram,
-    storage_buffer::{self, StorageBuffer, StorageBufferArray},
-    uniform_buffer::UniformBuffer,
-    vertex_array::VertexArray,
+use crate::{
+    audio_analyzer::Spectrum,
+    ui::plot::details::{
+        shader_program::ShaderProgram,
+        storage_buffer::{self, StorageBuffer, StorageBufferArray},
+        uniform_buffer::UniformBuffer,
+        vertex_array::VertexArray,
+    },
 };
 
 pub struct SpectrumRenderer {
@@ -17,9 +20,7 @@ pub struct SpectrumRenderer {
     storage_buffer: StorageBufferArray<f32>,
     storage_buffer2: StorageBufferArray<f32>,
     storage_buffer3: StorageBufferArray<f32>,
-    spectrum: Vec<f32>,
-    mean_spectrum: Vec<f32>,
-    peek_slow_falling: Vec<f32>,
+    spectrums: Option<(Spectrum, Spectrum, Spectrum)>,
 }
 impl SpectrumRenderer {
     const VERTEX_SHADER: &'static str = include_str!("../resources/barplot.vert");
@@ -50,41 +51,35 @@ impl SpectrumRenderer {
             storage_buffer,
             storage_buffer2,
             storage_buffer3,
-            spectrum: Vec::new(),
-            mean_spectrum: Vec::new(),
-            peek_slow_falling: Vec::new(),
+            spectrums: None,
         }
     }
 
-    pub fn set_spectrum(&mut self, spectrum: &[f32]) {
-        self.spectrum = spectrum.to_vec();
-        if self.mean_spectrum.is_empty() || self.peek_slow_falling.is_empty() {
-            self.mean_spectrum = spectrum.to_vec();
-            self.peek_slow_falling = spectrum.to_vec();
-        } else {
-            self.mean_spectrum = self
-                .mean_spectrum
-                .iter()
-                .zip(spectrum.iter())
-                .map(|(a, b)| a * 0.9 + b * 0.1)
-                .collect();
-            self.peek_slow_falling = self
-                .peek_slow_falling
-                .iter()
-                .zip(spectrum.iter())
-                .map(|(a, b)| {
-                    if b > a {
-                        return *b;
+    pub fn set_spectrum(&mut self, spectrum: &Spectrum) {
+        if let Some((last, mean, peek)) = &mut self.spectrums {
+            *last = spectrum.clone();
+            mean.into_iter()
+                .zip(spectrum.into_iter())
+                .for_each(|(current, new)| {
+                    *current = *current * 0.9 + new * 0.1;
+                });
+            peek.into_iter()
+                .zip(spectrum.into_iter())
+                .for_each(|(current, new)| {
+                    *current = *current * 0.9 + new * 0.1;
+                    if new > current {
+                        *current = *new;
                     } else {
-                        return a * 0.9;
+                        *current = *current * 0.9;
                     }
-                })
-                .collect();
+                });
+        } else {
+            self.spectrums = Some((spectrum.clone(), spectrum.clone(), spectrum.clone()));
         }
-
-        self.storage_buffer.store_array(spectrum);
-        self.storage_buffer2.store_array(&self.mean_spectrum);
-        self.storage_buffer3.store_array(&self.peek_slow_falling);
+        let (last, mean, peek) = self.spectrums.as_ref().unwrap();
+        self.storage_buffer.store_array(last.as_slice());
+        self.storage_buffer2.store_array(mean.as_slice());
+        self.storage_buffer3.store_array(peek.as_slice());
     }
 
     pub fn set_render_size(&mut self, size: (u32, u32)) {
@@ -103,9 +98,15 @@ impl SpectrumRenderer {
         self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
         self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
 
+        if self.spectrums.is_none() {
+            return;
+        }
+
+        let (last, mean, peek) = self.spectrums.as_ref().unwrap();
+
         // render mean_spectrum
-        let min = self.mean_spectrum.iter().cloned().reduce(f32::min).unwrap();
-        let max = self.mean_spectrum.iter().cloned().reduce(f32::max).unwrap();
+        let min = mean.into_iter().cloned().reduce(f32::min).unwrap();
+        let max = mean.into_iter().cloned().reduce(f32::max).unwrap();
         self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
         self.storage_buffer2
             .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
@@ -121,18 +122,8 @@ impl SpectrumRenderer {
         }
 
         // render peek_slow_falling spectrum
-        let min = self
-            .peek_slow_falling
-            .iter()
-            .cloned()
-            .reduce(f32::min)
-            .unwrap();
-        let max = self
-            .peek_slow_falling
-            .iter()
-            .cloned()
-            .reduce(f32::max)
-            .unwrap();
+        let min = peek.into_iter().cloned().reduce(f32::min).unwrap();
+        let max = peek.into_iter().cloned().reduce(f32::max).unwrap();
         self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
         self.storage_buffer3
             .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
@@ -148,8 +139,8 @@ impl SpectrumRenderer {
         }
 
         // render current spectrum
-        let min = self.spectrum.iter().cloned().reduce(f32::min).unwrap();
-        let max = self.spectrum.iter().cloned().reduce(f32::max).unwrap();
+        let min = last.into_iter().cloned().reduce(f32::min).unwrap();
+        let max = last.into_iter().cloned().reduce(f32::max).unwrap();
         self.min_max.buffer_subdata(&Vec2::new(min, max), 0);
         self.storage_buffer
             .bind(Self::BAR_VALUES_BUFFER_BINDING_POINT);
