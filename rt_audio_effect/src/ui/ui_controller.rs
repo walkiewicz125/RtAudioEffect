@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use egui::{FontData, FontDefinitions, FontFamily, FontId, TextStyle, TextureId};
 
@@ -40,13 +43,14 @@ impl UiController {
         }
     }
 
-    pub fn update_data(&self) {
+    pub fn update_data(&self, time_step: Duration) {
         self.spectrum_renderer_left.lock().unwrap().set_spectrum(
             self.audio_analyzer
                 .lock()
                 .unwrap()
                 .get_latest_spectrum()
                 .get_channel(0),
+            time_step,
         );
         self.spectrum_renderer_right.lock().unwrap().set_spectrum(
             &self
@@ -55,6 +59,7 @@ impl UiController {
                 .unwrap()
                 .get_latest_spectrum()
                 .get_channel(1),
+            time_step,
         );
 
         self.spectrogram_renderer_left.lock().unwrap().buffer_data(

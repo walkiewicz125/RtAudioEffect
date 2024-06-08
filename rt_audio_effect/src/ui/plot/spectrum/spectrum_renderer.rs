@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use glam::{Mat4, Vec2};
 use glamour::Matrix4;
 
@@ -55,22 +57,29 @@ impl SpectrumRenderer {
         }
     }
 
-    pub fn set_spectrum(&mut self, spectrum: &Spectrum) {
+    fn exp_decay(start: f32, end: f32, half_life: f32, time_step: f32) -> f32 {
+        let decay = (2.0_f32).ln() / half_life;
+        end + (start - end) * (-time_step * decay).exp()
+    }
+
+    pub fn set_spectrum(&mut self, spectrum: &Spectrum, time_step: Duration) {
         if let Some((last, mean, peek)) = &mut self.spectrums {
             *last = spectrum.clone();
             mean.into_iter()
                 .zip(spectrum.into_iter())
                 .for_each(|(current, new)| {
-                    *current = *current * 0.9 + new * 0.1;
+                    // *current = *current * 0.9 + new * 0.1;
+                    *current = Self::exp_decay(*current, *new, 0.1, time_step.as_secs_f32());
                 });
             peek.into_iter()
                 .zip(spectrum.into_iter())
                 .for_each(|(current, new)| {
-                    *current = *current * 0.9 + new * 0.1;
+                    // *current = *current * 0.9 + new * 0.1;
                     if new > current {
                         *current = *new;
                     } else {
-                        *current = *current * 0.9;
+                        // *current = *current * 0.9;
+                        *current = Self::exp_decay(*current, 0.0, 0.1, time_step.as_secs_f32());
                     }
                 });
         } else {

@@ -1,32 +1,11 @@
 use converters::{hz_to_mel, mel_to_hz};
 
-struct MelFilter {
-    weights: Vec<f32>,
-}
+use super::Spectrum;
 
-impl MelFilter {
-    fn new(weights: Vec<f32>) -> MelFilter {
-        MelFilter {
-            weights: Self::normalize(weights),
-        }
-    }
+struct FilterWeights(Vec<f32>);
 
-    fn normalize(weights: Vec<f32>) -> Vec<f32> {
-        let sum: f32 = weights.iter().sum();
-        weights.iter().map(|&weight| weight / sum).collect()
-    }
-
-    fn apply(&self, spectrum: &[f32]) -> f32 {
-        self.weights
-            .iter()
-            .zip(spectrum)
-            .map(|(&weight, &spectrum_value)| weight * spectrum_value)
-            .sum()
-    }
-}
-
-struct MelFilterBank {
-    filters: Vec<MelFilter>,
+pub struct MelFilterBank {
+    filters: Vec<FilterWeights>,
 }
 
 impl MelFilterBank {
@@ -70,17 +49,38 @@ impl MelFilterBank {
 
         let filters = filters_weights
             .into_iter()
-            .map(|weights| MelFilter::new(weights))
-            .collect::<Vec<MelFilter>>();
+            .map(|weights| FilterWeights(weights))
+            .collect::<Vec<FilterWeights>>();
 
         MelFilterBank { filters }
     }
 
-    pub fn apply(&self, spectrum: &[f32]) -> Vec<f32> {
+    pub fn apply(&self, spectrum: &Spectrum) -> Spectrum {
         self.filters
             .iter()
             .map(|filter| filter.apply(spectrum))
             .collect()
+    }
+}
+
+impl FilterWeights {
+    fn normalize(weights: Vec<f32>) -> Vec<f32> {
+        let sum: f32 = weights.iter().sum();
+        weights.iter().map(|&weight| weight / sum).collect()
+    }
+
+    fn apply(&self, spectrum: &Spectrum) -> f32 {
+        self.0
+            .iter()
+            .zip(spectrum)
+            .map(|(&weight, &spectrum_value)| weight * spectrum_value)
+            .sum()
+    }
+}
+
+impl From<Vec<f32>> for FilterWeights {
+    fn from(weights: Vec<f32>) -> FilterWeights {
+        FilterWeights(weights)
     }
 }
 
@@ -111,8 +111,8 @@ mod tests {
 
         // Assert the weights of each filter
         for filter in mel_filter_bank.filters {
-            assert_eq!(filter.weights.len(), fft_width);
-            filter.weights.iter().for_each(|&weight| {
+            assert_eq!(filter.0.len(), fft_width);
+            filter.0.iter().for_each(|&weight| {
                 assert!(weight >= 0.0 && weight <= 1.0);
             });
         }
@@ -122,7 +122,7 @@ mod tests {
     fn test_mel_filter_normalize() {
         let weights = vec![0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25, 0.0];
 
-        let normalized_weights = MelFilter::normalize(weights);
+        let normalized_weights = FilterWeights::normalize(weights);
 
         let expected_normalized_weights =
             vec![0.0, 0.0625, 0.125, 0.1875, 0.25, 0.1875, 0.125, 0.0625, 0.0];
@@ -133,9 +133,9 @@ mod tests {
     #[test]
     fn test_mel_filter_apply() {
         let weights = vec![0.0, 0.25, 0.5, 0.75, 1.0, 0.75, 0.5, 0.25, 0.0];
-        let mel_filter = MelFilter::new(weights);
+        let mel_filter = FilterWeights(weights);
 
-        let spectrum = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+        let spectrum = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].into();
         let filtered_spectrum = mel_filter.apply(&spectrum);
 
         let expected_normalized_weights =
@@ -143,7 +143,7 @@ mod tests {
 
         let expected_value = expected_normalized_weights
             .iter()
-            .zip(spectrum.iter())
+            .zip(spectrum.into_iter())
             .map(|(&weight, &spectrum_value)| weight * spectrum_value)
             .sum();
 

@@ -69,7 +69,7 @@ impl AppContext {
         ));
 
         let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
-            Duration::from_secs_f32(0.01),
+            Duration::from_secs_f32(0.002),
             Duration::from_secs_f32(1.0),
             4800,
             audio_stream.lock().unwrap().get_parameters(),
@@ -129,7 +129,7 @@ impl AppContext {
 
             let egui_context = self.app_window.get_egui_context();
 
-            self.ui_controller.update_data();
+            self.ui_controller.update_data(elapsed_time);
 
             egui::CentralPanel::default().show(&egui_context, |ui| {
                 ui.add(self.ui_controller.get_central_panel(fps));

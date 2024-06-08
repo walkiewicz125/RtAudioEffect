@@ -15,6 +15,10 @@ impl Spectrum {
     pub fn as_slice(&self) -> &[f32] {
         &self.0
     }
+
+    pub fn new() -> Self {
+        Spectrum(Vec::new())
+    }
 }
 
 impl FromIterator<f32> for Spectrum {
@@ -64,6 +68,7 @@ impl From<Vec<f32>> for Spectrum {
         Spectrum(data)
     }
 }
+
 impl From<&[f32]> for Spectrum {
     fn from(data: &[f32]) -> Spectrum {
         Spectrum(data.to_vec())
