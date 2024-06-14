@@ -1,29 +1,11 @@
 use std::{
-    io::Read,
+    io::{Read, Write},
     net::{SocketAddr, TcpStream},
 };
 
 use log::info;
 
-#[derive(Debug)]
-pub struct MessageFrame {
-    id: u32,
-    data: Vec<u8>,
-}
-
-impl MessageFrame {
-    pub fn new(id: u32, data: Vec<u8>) -> Self {
-        Self { id, data }
-    }
-
-    pub fn id(&self) -> u32 {
-        self.id
-    }
-
-    pub fn data(&self) -> &[u8] {
-        &self.data
-    }
-}
+use super::{Message, MessageFrame};
 
 pub struct ServiceClient {
     pub stream: TcpStream,
@@ -40,7 +22,7 @@ impl ServiceClient {
         }
     }
 
-    pub fn recv_message(&mut self) -> MessageFrame {
+    pub fn recv_message(&mut self) -> Message {
         let mut id_buff: [u8; 4] = [0; 4];
         self.stream
             .read_exact(&mut id_buff)
@@ -57,6 +39,12 @@ impl ServiceClient {
             .read_exact(&mut data_buff)
             .expect("Failed to read message data");
 
-        MessageFrame::new(u32::from_le_bytes(id_buff), data_buff)
+        MessageFrame::new(u32::from_le_bytes(id_buff), data_buff).into()
+    }
+
+    pub fn send_message(&mut self, message: Message) {
+        self.stream
+            .write_all(&MessageFrame::from(message).get_bytes())
+            .expect("Failed to send message");
     }
 }

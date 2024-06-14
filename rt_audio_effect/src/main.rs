@@ -8,7 +8,7 @@ use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use service::Service;
+use service::AudioHeadlightService;
 use std::{
     io::{BufRead, BufReader},
     net::TcpStream,
@@ -21,7 +21,6 @@ use ui::central_panel::HeatMapImage;
 use crate::{
     audio::{audio_stream::AudioStream, AudioManager, AudioStreamConsumer},
     audio_analyzer::StreamAnalyzer,
-    messages::Message,
     service::ServiceRegister,
     ui::ui_controller::UiController,
 };
@@ -31,7 +30,6 @@ mod service;
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
 extern crate serializer;
-pub mod messages;
 
 fn main() {
     info!("Hello RtAudioEffect!");
@@ -59,17 +57,17 @@ struct AppContext {
     analyzer: Arc<Mutex<StreamAnalyzer>>,
     app_window: AppWindow,
     ui_controller: UiController,
-    service: Arc<Service>,
+    service: Arc<Mutex<AudioHeadlightService>>,
 }
 
 impl AppContext {
-    fn new(service: Arc<Service>) -> AppContext {
+    fn new(service: Arc<Mutex<AudioHeadlightService>>) -> AppContext {
         let audio_stream = Arc::new(Mutex::new(
             AudioStream::new(AudioManager::get_default_loopback().unwrap()).unwrap(),
         ));
 
         let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
-            Duration::from_secs_f32(0.002),
+            Duration::from_secs_f32(0.02),
             Duration::from_secs_f32(1.0),
             4800,
             audio_stream.lock().unwrap().get_parameters(),
@@ -107,6 +105,7 @@ impl AppContext {
         });
 
         // let mut connection = self.service.wait_for_client();
+        self.service.lock().unwrap().start();
 
         // let msg: Message = connection.recv_message().into();
         // println!("Received: {:#?}", msg);

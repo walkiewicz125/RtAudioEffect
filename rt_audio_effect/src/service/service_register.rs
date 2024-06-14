@@ -1,13 +1,16 @@
-use std::{net::TcpListener, sync::Arc};
+use std::{
+    net::TcpListener,
+    sync::{Arc, Mutex},
+};
 
 use log::info;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 
-use super::Service;
+use super::AudioHeadlightService;
 
 pub struct ServiceRegister {
     mdns: ServiceDaemon,
-    registered_services: Vec<Arc<Service>>,
+    registered_services: Vec<Arc<Mutex<AudioHeadlightService>>>,
 }
 
 impl ServiceRegister {
@@ -20,7 +23,7 @@ impl ServiceRegister {
         }
     }
 
-    pub fn add_service(&mut self, name: &str) -> Arc<Service> {
+    pub fn add_service(&mut self, name: &str) -> Arc<Mutex<AudioHeadlightService>> {
         let listner = TcpListener::bind("0.0.0.0:0").expect("Failed to bind to random port");
         let port = listner.local_addr().expect("").port();
         info!("{} is listening on {}:{}", name, "localhost", port);
@@ -40,7 +43,11 @@ impl ServiceRegister {
             .register(service_info.clone())
             .expect("Failed to register RtAudioEffect service in mDNS deamon");
 
-        let new_serivce = Arc::new(Service::new(name, listner, service_info));
+        let new_serivce = Arc::new(Mutex::new(AudioHeadlightService::new(
+            name,
+            listner,
+            service_info,
+        )));
         self.registered_services.push(new_serivce.clone());
         new_serivce
     }
