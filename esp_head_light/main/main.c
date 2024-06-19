@@ -28,28 +28,9 @@
 #include "lwip/ip_addr.h"
 #include "lwip/err.h"
 #include "lwip/api.h"
+#include "driver/rmt.h"
 
-void resolve_mdns_host(const char *host_name)
-{
-    printf("Query A: %s.local\n", host_name);
-
-    esp_ip4_addr_t addr;
-    addr.addr = 0;
-
-    esp_err_t err = mdns_query_a(host_name, 2000, &addr);
-    if (err)
-    {
-        if (err == ESP_ERR_NOT_FOUND)
-        {
-            printf("Host was not found!\n");
-            return;
-        }
-        printf("Query Failed\n");
-        return;
-    }
-
-    printf(IPSTR, IP2STR(&addr));
-}
+char app_name[] = "RtAudioEffectHeadLight";
 
 static EventGroupHandle_t s_wifi_event_group;
 const char *ssid = "";
@@ -86,107 +67,10 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
-static const char *ip_protocol_str[] = {"V4", "V6", "MAX"};
 
-void mdns_print_results(mdns_result_t *results)
+void init_hw()
 {
-    mdns_result_t *r = results;
-    mdns_ip_addr_t *a = NULL;
-    int i = 1, t;
-    while (r)
-    {
-        printf("%d: Type: %s\n", i++, ip_protocol_str[r->ip_protocol]);
-        if (r->instance_name)
-        {
-            printf("  PTR : %s\n", r->instance_name);
-        }
-        if (r->hostname)
-        {
-            printf("  SRV : %s.local:%u\n", r->hostname, r->port);
-        }
-        if (r->txt_count)
-        {
-            printf("  TXT : [%u] ", r->txt_count);
-            for (t = 0; t < r->txt_count; t++)
-            {
-                printf("%s=%s; ", r->txt[t].key, r->txt[t].value);
-            }
-            printf("\n");
-        }
-        a = r->addr;
-        while (a)
-        {
-            if (a->addr.type == IPADDR_TYPE_V6)
-            {
-                printf("  AAAA: " IPV6STR "\n", IPV62STR(a->addr.u_addr.ip6));
-            }
-            else
-            {
-                printf("  A   : " IPSTR "\n", IP2STR(&(a->addr.u_addr.ip4)));
-                // struct udp_pcb *udp_sock = udp_new();
-                // udp_bind(udp_sock, IP_ADDR_ANY, 0);
-                // struct sockaddr_in addr;
-                // addr.sin_addr.s_addr = a->addr.u_addr.ip4.addr;
-                // addr.sin_family = AF_INET;
-                // addr.sin_port = htons(r->port);
-                // udp_sendto(udp_sock, "Hello", 5, (struct sockaddr *)&addr, r->port);
-
-                struct netconn_t *conn = netconn_new(NETCONN_TCP);
-                if (conn != NULL)
-                {
-                    err_t err = netconn_connect(conn, &a->addr.u_addr.ip4, r->port);
-                    if (err == ERR_OK)
-                    {
-                        printf("Connected to %s:%d\n", ip4addr_ntoa(&a->addr.u_addr.ip4), r->port);
-                        char ech_msg[] = "\x00\x00\x00\x00\x05\x00\x00\x00hello";
-                        netconn_write(conn, ech_msg, sizeof(ech_msg), NETCONN_COPY);
-
-                        netconn_close(conn);
-                        netconn_delete(conn);
-                    }
-                    else
-                    {
-                        printf("Connection failed\n");
-                    }
-                }
-                else
-                {
-                    printf("Failed to create new connection\n");
-                }
-            }
-            a = a->next;
-        }
-        r = r->next;
-    }
-}
-void find_mdns_service(const char *service_name, const char *proto)
-{
-    ESP_LOGI("MAIN_MDNS", "Query PTR: %s.%s.local", service_name, proto);
-
-    mdns_result_t *results = NULL;
-    esp_err_t err = mdns_query_ptr(service_name, proto, 3000, 20, &results);
-
-    printf("################ Query result: %d\n", err);
-    if (err)
-    {
-        ESP_LOGE("MAIN_MDNS", "Query Failed");
-        return;
-    }
-    if (!results)
-    {
-        ESP_LOGW("MAIN_MDNS", "No results found!");
-        return;
-    }
-
-    mdns_print_results(results);
-    mdns_query_results_free(results);
-}
-
-void app_main(void)
-{
-    printf("Hello world!\n");
     ESP_ERROR_CHECK(nvs_flash_init());
-    s_wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
@@ -213,10 +97,13 @@ void app_main(void)
 
     printf("%" PRIu32 "MB %s flash\n", flash_size / (uint32_t)(1024 * 1024),
            (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+}
 
+void init_wifi()
+{
     esp_netif_t *wifi = esp_netif_create_default_wifi_sta();
+    esp_netif_set_hostname(wifi, app_name);
 
-    esp_netif_set_hostname(wifi, "RtAudioEffectHeadLight");
     wifi_init_config_t wifi_initialization = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_initialization));
     esp_event_handler_instance_t instance_any_id;
@@ -230,6 +117,7 @@ void app_main(void)
             .threshold.authmode = WIFI_AUTH_WPA_WPA2_PSK,
         },
     };
+    s_wifi_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_netif_dhcpc_start(wifi));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_configuration));
     ESP_ERROR_CHECK(esp_wifi_start());
@@ -253,24 +141,117 @@ void app_main(void)
     {
         ESP_LOGE("MAIN_WIFI", "UNEXPECTED EVENT");
     }
+}
 
+#include "main.hpp"
+#include "led_strip/led_strip.h"
+/**
+ * @brief Simple helper function, converting HSV color space to RGB color space
+ *
+ * Wiki: https://en.wikipedia.org/wiki/HSL_and_HSV
+ *
+ */
+void led_strip_hsv2rgb(uint32_t h, uint32_t s, uint32_t v, uint32_t *r, uint32_t *g, uint32_t *b)
+{
+    h %= 360; // h -> [0,360]
+    uint32_t rgb_max = v * 2.55f;
+    uint32_t rgb_min = rgb_max * (100 - s) / 100.0f;
+
+    uint32_t i = h / 60;
+    uint32_t diff = h % 60;
+
+    // RGB adjustment amount by hue
+    uint32_t rgb_adj = (rgb_max - rgb_min) * diff / 60;
+
+    switch (i)
+    {
+    case 0:
+        *r = rgb_max;
+        *g = rgb_min + rgb_adj;
+        *b = rgb_min;
+        break;
+    case 1:
+        *r = rgb_max - rgb_adj;
+        *g = rgb_max;
+        *b = rgb_min;
+        break;
+    case 2:
+        *r = rgb_min;
+        *g = rgb_max;
+        *b = rgb_min + rgb_adj;
+        break;
+    case 3:
+        *r = rgb_min;
+        *g = rgb_max - rgb_adj;
+        *b = rgb_max;
+        break;
+    case 4:
+        *r = rgb_min + rgb_adj;
+        *g = rgb_min;
+        *b = rgb_max;
+        break;
+    default:
+        *r = rgb_max;
+        *g = rgb_min;
+        *b = rgb_max - rgb_adj;
+        break;
+    }
+}
+
+#define EXAMPLE_CHASE_SPEED_MS (10)
+
+void app_main(void)
+{
+    printf("%s\n", app_name);
+
+    init_hw();
+    init_wifi();
     mdns_init();
 
-    printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
-    for (int i = 10; i >= 0; i--)
+    rmt_config_t config = RMT_DEFAULT_CONFIG_TX(GPIO_NUM_2, RMT_CHANNEL_0);
+    // set counter clock to 40MHz
+    config.clk_div = 2;
+    ESP_ERROR_CHECK(rmt_config(&config));
+    ESP_ERROR_CHECK(rmt_driver_install(config.channel, 0, 0));
+
+    // install ws2812 driver
+    led_strip_config_t strip_config = LED_STRIP_DEFAULT_CONFIG(1, (led_strip_dev_t)config.channel);
+    led_strip_t *strip = led_strip_new_rmt_ws2812(&strip_config);
+    if (!strip)
     {
-
-        // resolve_mdns_host("RtAudioEffect");
-        // resolve_mdns_host("RtAudioEffect.local");
-        // resolve_mdns_host("RtAudioEffect.local.");
-        // resolve_mdns_host("_RtAudioEffect._udp");
-        // resolve_mdns_host("_RtAudioEffect._udp.local");
-        // resolve_mdns_host("_RtAudioEffect._udp.local.");
-
-        find_mdns_service("_RtAudioEffect", "_tcp");
-        printf("Restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGE("LedStrip", "install WS2812 driver failed");
     }
+    // Clear LED strip (turn off all LEDs)
+    ESP_ERROR_CHECK(strip->clear(strip, 100));
+
+    printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
+
+    uint32_t red = 0;
+    uint32_t green = 0;
+    uint32_t blue = 0;
+    uint16_t hue = 0;
+    uint16_t start_rgb = 0;
+
+    while (true)
+    {
+        // Build RGB values
+        hue = start_rgb % 360;
+        led_strip_hsv2rgb(hue, 100, 100, &red, &green, &blue);
+        // Write RGB values to strip driver
+        ESP_ERROR_CHECK(strip->set_pixel(strip, 0, red, green, blue));
+        // Flush RGB values to LEDs
+        ESP_ERROR_CHECK(strip->refresh(strip, 100));
+        vTaskDelay(pdMS_TO_TICKS(EXAMPLE_CHASE_SPEED_MS));
+
+        start_rgb += 1;
+    }
+    while (true)
+    {
+        main_cpp();
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        printf("Restarting main_cpp()\n");
+    }
+
     printf("Restarting now.\n");
     fflush(stdout);
     esp_restart();
