@@ -20,13 +20,22 @@ impl IdentityMessage {
 #[derive(Serializable, Default, Debug)]
 pub struct IdentityRequestMessage {}
 
+#[derive(Serializable, Default, Debug)]
+pub struct SetColorMessage {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
 #[derive(Debug)]
 pub enum Message {
     Invalid,
+    Ack,
     Echo(EchoMessage),
     EchoReply(EchoMessage),
     IdentityRequest(IdentityRequestMessage),
     Identity(IdentityMessage),
+    SetColor(SetColorMessage),
 }
 
 impl Into<Message> for MessageFrame {
@@ -37,6 +46,9 @@ impl Into<Message> for MessageFrame {
                 return Message::Invalid;
             }
             1 => {
+                return Message::Ack;
+            }
+            2 => {
                 if let Ok(message) = EchoMessage::try_from_bytes(self.data()) {
                     return Message::Echo(message);
                 } else {
@@ -44,7 +56,7 @@ impl Into<Message> for MessageFrame {
                     return Message::Invalid;
                 }
             }
-            2 => {
+            3 => {
                 if let Ok(message) = EchoMessage::try_from_bytes(self.data()) {
                     return Message::EchoReply(message);
                 } else {
@@ -52,7 +64,7 @@ impl Into<Message> for MessageFrame {
                     return Message::Invalid;
                 }
             }
-            3 => {
+            4 => {
                 if let Ok(message) = IdentityRequestMessage::try_from_bytes(self.data()) {
                     return Message::IdentityRequest(message);
                 } else {
@@ -60,11 +72,19 @@ impl Into<Message> for MessageFrame {
                     return Message::Invalid;
                 }
             }
-            4 => {
+            5 => {
                 if let Ok(message) = IdentityMessage::try_from_bytes(self.data()) {
                     return Message::Identity(message);
                 } else {
                     error!("Failed to parse Identity");
+                    return Message::Invalid;
+                }
+            }
+            6 => {
+                if let Ok(message) = SetColorMessage::try_from_bytes(self.data()) {
+                    return Message::SetColor(message);
+                } else {
+                    error!("Failed to parse SetColor");
                     return Message::Invalid;
                 }
             }
@@ -83,21 +103,26 @@ impl From<Message> for MessageFrame {
                 error!("Trying to serialize invalid message");
                 MessageFrame::new(0, Vec::new())
             }
+            Message::Ack => MessageFrame::new(1, Vec::new()),
             Message::Echo(echo_message) => {
-                let data = echo_message.get_bytes();
-                MessageFrame::new(1, data)
-            }
-            Message::EchoReply(echo_message) => {
                 let data = echo_message.get_bytes();
                 MessageFrame::new(2, data)
             }
+            Message::EchoReply(echo_message) => {
+                let data = echo_message.get_bytes();
+                MessageFrame::new(3, data)
+            }
             Message::IdentityRequest(identity_request_message) => {
                 let data = identity_request_message.get_bytes();
-                MessageFrame::new(3, data)
+                MessageFrame::new(4, data)
             }
             Message::Identity(identity_message) => {
                 let data = identity_message.get_bytes();
-                MessageFrame::new(4, data)
+                MessageFrame::new(5, data)
+            }
+            Message::SetColor(set_color_message) => {
+                let data = set_color_message.get_bytes();
+                MessageFrame::new(6, data)
             }
         }
     }
