@@ -1,8 +1,13 @@
-use std::{net::TcpStream, thread::sleep, time::Duration};
+use std::{io::Write, net::{Ipv4Addr, TcpStream}, thread::sleep, time::Duration};
 
 use esp_idf_hal::{delay::FreeRtos, peripherals::Peripherals, rmt::{FixedLengthSignal, PinState, Pulse, TxRmtConfig, TxRmtDriver}};
 use esp_idf_svc::{eventloop::EspSystemEventLoop, mdns::{EspMdns, Interface, Protocol, QueryResult, Type}, nvs::EspDefaultNvsPartition, wifi::{ClientConfiguration, Configuration, EspWifi}};
 use esp_idf_sys::mdns_result_t;
+use headlight_if::{EchoMessage, Message, MessageFrame};
+
+extern crate headlight_if;
+extern crate serializer;
+
 
 fn main() {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -29,14 +34,6 @@ fn main() {
     wifi.start().unwrap();
     wifi.connect().unwrap();
 
-    
-
-
-    // let stream = TcpStream::connect(host_ip).unwrap();
-
-
-    
-
     while !wifi.is_connected().unwrap(){
         let config = wifi.get_configuration().unwrap();
         println!("Waiting for station {:?}", config);
@@ -45,7 +42,6 @@ fn main() {
     println!("Should be connected now");
 
     println!("IP info: {:?}", wifi.sta_netif().get_ip_info().unwrap());
-
 
     let mdns = EspMdns::take().unwrap();
     let mut results = [QueryResult{
@@ -58,7 +54,7 @@ fn main() {
         ip_protocol: Protocol::V4, 
     }];
 
-    let host_ip = loop{
+    loop{
         sleep(Duration::from_secs_f32(0.1));
         let result = mdns.query_srv("RtAudioEffect", "_RtAudioEffect", "_tcp", Duration::from_secs(5), &mut results);
         match result {
@@ -69,7 +65,7 @@ fn main() {
                 else {
                     println!("Found {:} results: {:?}", count, results[0]);
                 }
-                continue;
+                break;
             },
             Err(e) => {
                 println!("Error: {:}", e);
@@ -87,6 +83,17 @@ fn main() {
     FreeRtos::delay_ms(3000);
 
 
+
+    
+    let ip = results[0].addr.last().unwrap();
+    let port = results[0].port;
+    
+    let mut stream = TcpStream::connect((*ip, port)).unwrap();
+    
+    let message = Message::Echo(EchoMessage{ message: "Hello, World! from rust in ESP32".to_string() });
+    stream
+            .write_all(&MessageFrame::from(message).get_bytes())
+            .expect("Failed to send message");
 
 
     // infinite rainbow loop at 100% brightness

@@ -781,7 +781,17 @@ dependencies = [
  "esp-idf-hal",
  "esp-idf-svc",
  "esp-idf-sys",
+ "headlight_if",
  "log",
+ "serializer",
+]
+
+[[package]]
+name = "headlight_if"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serializer",
 ]
 
 [[package]]
@@ -1312,6 +1322,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79e674e01f999af37c49f70a6ede167a8a60b2503e56c5599532a65baa5969a0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "serializer"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "serializer_macro",
+]
+
+[[package]]
+name = "serializer_macro"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
