@@ -30,7 +30,10 @@ impl AudioStreamSender {
 
     pub fn send_data(&mut self, data: Vec<f32>) {
         for data_stream_receiver in self.data_stream_receivers.iter() {
-            data_stream_receiver.lock().unwrap().store(data.clone());
+            data_stream_receiver
+                .lock()
+                .unwrap()
+                .store(data.clone().into());
         }
     }
 }

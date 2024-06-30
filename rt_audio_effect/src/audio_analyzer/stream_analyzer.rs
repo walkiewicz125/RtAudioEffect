@@ -1,6 +1,5 @@
 use std::{
     sync::{Arc, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -9,26 +8,28 @@ use log::{info, trace};
 use crate::audio::{AudioBuffer, AudioStreamConsumer, StreamParameters};
 
 use super::{
-    AnalyzerParameters, Magnitude, ManyChannelsSpectrums, MultiChannel, Spectrogram, Spectrum,
-    SpectrumAnalyzer, TimeSeries,
+    AnalyzerParameters, FftAnalyzer, Magnitude, MelFilterBank, MultiChannel, Spectrogram, Spectrum,
+    TimeSeries,
 };
 
 pub trait StreamAnalyzerReceiver: Send {
-    fn receive(&mut self, spectrums: &ManyChannelsSpectrums);
+    fn receive(&mut self, spectrums: &MultiChannel<Spectrum>);
 }
 
 pub struct StreamAnalyzer {
     audio_buffer: Arc<Mutex<AudioBuffer>>,
     analyzer_parameters: Arc<AnalyzerParameters>,
-    spectrum_analyzer: SpectrumAnalyzer,
+    spectrum_analyzer: FftAnalyzer,
     spectrogram: Spectrogram,
+    mel_filter_bank: MelFilterBank,
+    mel_spectrums: MultiChannel<Spectrum>,
     receivers: Vec<Arc<Mutex<dyn StreamAnalyzerReceiver>>>,
     is_alive: bool,
 }
 
 pub trait AudioAnalyzysProvider {
     fn get_analyzer_parameters(&self) -> Arc<AnalyzerParameters>;
-    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums;
+    fn get_latest_spectrum(&self) -> MultiChannel<Spectrum>;
     fn get_spectrogram_for_channel(&self, channel: usize) -> (TimeSeries<Magnitude>, (u32, u32));
 }
 
@@ -49,17 +50,26 @@ impl AudioStreamConsumer for StreamAnalyzer {
                     total_sample_count,
                     new_samples
                 );
-                let mut spectrums = vec![];
-                for (channel, samples) in new_multichannel_samples.iter().enumerate() {
-                    trace!("Processing samples for channel: {}", channel);
-                    spectrums.push(self.spectrum_analyzer.analyze(&samples));
-                }
+                let mut spectrums: Vec<Spectrum> = vec![];
 
-                self.spectrogram.push_spectrums(spectrums.clone());
+                new_multichannel_samples
+                    .into_iter()
+                    .enumerate()
+                    .for_each(|(channel, samples)| {
+                        trace!("Processing samples for channel: {}", channel);
+                        spectrums.push(self.spectrum_analyzer.analyze(&samples));
+                    });
 
-                for receiver in self.receivers.iter() {
-                    receiver.lock().unwrap().receive(&spectrums);
-                }
+                self.spectrogram.push_spectrums(spectrums.clone().into());
+                self.mel_spectrums = spectrums
+                    .iter()
+                    .map(|spectrum| self.mel_filter_bank.apply(spectrum))
+                    .collect::<Vec<Spectrum>>()
+                    .into();
+
+                self.receivers.iter().for_each(|receiver| {
+                    receiver.lock().unwrap().receive(&spectrums.clone().into());
+                });
             }
         }
     }
@@ -78,7 +88,7 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
         self.get_analyzer_parameters()
     }
 
-    fn get_latest_spectrum(&self) -> ManyChannelsSpectrums {
+    fn get_latest_spectrum(&self) -> MultiChannel<Spectrum> {
         self.spectrogram.get_latest_spectrum()
     }
 
@@ -88,6 +98,8 @@ impl AudioAnalyzysProvider for StreamAnalyzer {
 }
 
 impl StreamAnalyzer {
+    const NUM_OF_MEL_FILTERS: usize = 40;
+
     pub fn new(
         refresh_time: Duration,
         buffer_duration: Duration,
@@ -111,17 +123,25 @@ impl StreamAnalyzer {
             sample_rate: stream_parameters.sample_rate,
         });
 
+        let mel_filter_bank = MelFilterBank::new(
+            Self::NUM_OF_MEL_FILTERS,
+            parameters.spectrum_width,
+            parameters.sample_rate as f32,
+        );
+
         StreamAnalyzer {
             audio_buffer: Arc::new(Mutex::new(AudioBuffer::new(
                 stream_parameters.clone(),
                 buffer_duration,
             ))),
             analyzer_parameters: parameters.clone(),
-            spectrum_analyzer: SpectrumAnalyzer::new(
+            spectrum_analyzer: FftAnalyzer::new(
                 spectrum_width,
                 stream_parameters.sample_rate as usize,
             ),
             spectrogram: Spectrogram::new(parameters, stream_parameters.clone()),
+            mel_filter_bank,
+            mel_spectrums: MultiChannel::new(stream_parameters.channels as usize, Spectrum::new()),
             receivers: vec![],
             is_alive: true,
         }

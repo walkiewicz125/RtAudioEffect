@@ -1,22 +1,14 @@
-use std::{
-    borrow::BorrowMut,
-    marker::PhantomData,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use egui::{
-    epaint::{TessellationOptions, TextureManager},
-    load::SizedTexture,
-    vec2, Align, CollapsingHeader, Color32, ColorImage, Context, ImageData, ImageSource, Layout,
-    Pos2, Rect, Response, Rounding, Sense, Separator, Slider, TextureId, TextureOptions, Ui, Vec2,
-    Widget,
+    load::SizedTexture, vec2, Align, CollapsingHeader, Color32, ColorImage, Context, ImageData,
+    Layout, Sense, TextureOptions, Ui, Vec2, Widget,
 };
-use log::info;
 
 use crate::{audio::audio_stream::AudioStream, audio_analyzer::AudioAnalyzysProvider};
 
 use super::{
-    helpers::{self, add_columns, add_rows},
+    helpers::add_columns,
     plot::spectrum::{
         spectrogram_renderer::SpectrogramRenderer,
         spectrogram_renderer_widget::SpectrogramRendererWidget,
@@ -32,7 +24,7 @@ pub struct CentralPanel {
     spectrogram_left: SpectrogramRendererWidget,
     spectrogram_right: SpectrogramRendererWidget,
     heat_map: HeatMapImage,
-    auto_range: bool,
+    _auto_range: bool,
     fps: f32,
 }
 
@@ -64,7 +56,7 @@ impl CentralPanel {
                 renderer: spectrogram_renderer_right,
             },
             heat_map,
-            auto_range,
+            _auto_range: auto_range,
             fps,
         }
     }

@@ -1,57 +1,49 @@
 mod audio;
 mod audio_analyzer;
-mod audio_annotator;
 mod logger;
 mod ui;
 
-use audio_analyzer::{ManyChannelsSpectrums, StreamAnalyzerReceiver};
-use audio_annotator::StreamAnalyzerAnnotator;
+use audio_analyzer::StreamAnalyzerReceiver;
 use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
 use mdns_sd::{ServiceDaemon, ServiceInfo};
-use ui::central_panel::HeatMapImage;
-
+use service::AudioHeadlightService;
 use std::{
+    io::{BufRead, BufReader},
+    net::TcpStream,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
+use ui::central_panel::HeatMapImage;
 
 use crate::{
     audio::{audio_stream::AudioStream, AudioManager, AudioStreamConsumer},
     audio_analyzer::StreamAnalyzer,
+    service::ServiceRegister,
     ui::ui_controller::UiController,
 };
 
+mod service;
+
 const SCREEN_WIDTH: u32 = 1920;
 const SCREEN_HEIGHT: u32 = 1080;
+extern crate serializer;
 
 fn main() {
     info!("Hello RtAudioEffect!");
 
     if let Err(err) =
-        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
     {
         eprintln!("log::set_logger failed: {err:#?}");
     }
 
-    let mdns = ServiceDaemon::new().expect("Failed to create mDNS daemon");
-    let rt_audio_efect_service = ServiceInfo::new(
-        "_RtAudioEffect._udp.local.",
-        "RtAudioEffect",
-        "RtAudioEffect.local.",
-        "127.0.0.1",
-        12337,
-        None,
-    )
-    .unwrap()
-    .enable_addr_auto();
+    let mut service_register = ServiceRegister::new();
+    let service = service_register.add_service("RtAudioEffect");
 
-    mdns.register(rt_audio_efect_service)
-        .expect("Failed to register RtAudioEffect service in mDNS deamon");
-
-    let mut context = AppContext::new();
+    let mut context = AppContext::new(service);
 
     if context.run() {
         info!("RtAudioEffect exit successfully");
@@ -63,33 +55,23 @@ fn main() {
 struct AppContext {
     audio_stream: Arc<Mutex<AudioStream>>,
     analyzer: Arc<Mutex<StreamAnalyzer>>,
-    annotator: Arc<Mutex<StreamAnalyzerAnnotator>>,
     app_window: AppWindow,
     ui_controller: UiController,
+    service: Arc<Mutex<AudioHeadlightService>>,
 }
 
 impl AppContext {
-    fn new() -> AppContext {
+    fn new(service: Arc<Mutex<AudioHeadlightService>>) -> AppContext {
         let audio_stream = Arc::new(Mutex::new(
             AudioStream::new(AudioManager::get_default_loopback().unwrap()).unwrap(),
         ));
 
         let analyzer = Arc::new(Mutex::new(StreamAnalyzer::new(
-            Duration::from_secs_f32(0.01),
+            Duration::from_secs_f32(0.02),
             Duration::from_secs_f32(1.0),
             4800,
             audio_stream.lock().unwrap().get_parameters(),
         )));
-        let annotator = Arc::new(Mutex::new(StreamAnalyzerAnnotator::new(
-            analyzer.lock().unwrap().get_analyzer_parameters(),
-            Duration::from_secs_f32(1.0),
-            audio_stream.lock().unwrap().get_parameters().channels as usize,
-        )));
-
-        analyzer
-            .lock()
-            .unwrap()
-            .register_receiver(annotator.clone());
 
         audio_stream
             .lock()
@@ -108,9 +90,9 @@ impl AppContext {
         AppContext {
             audio_stream,
             analyzer,
-            annotator,
             app_window,
             ui_controller,
+            service,
         }
     }
 
@@ -121,6 +103,12 @@ impl AppContext {
                 analyzer_clone.lock().unwrap().process_new_samples();
             }
         });
+
+        // let mut connection = self.service.wait_for_client();
+        self.service.lock().unwrap().start();
+
+        // let msg: Message = connection.recv_message().into();
+        // println!("Received: {:#?}", msg);
 
         self.audio_stream.lock().unwrap().start();
 
@@ -140,7 +128,7 @@ impl AppContext {
 
             let egui_context = self.app_window.get_egui_context();
 
-            self.ui_controller.update_data();
+            self.ui_controller.update_data(elapsed_time);
 
             egui::CentralPanel::default().show(&egui_context, |ui| {
                 ui.add(self.ui_controller.get_central_panel(fps));
