@@ -149,7 +149,7 @@ impl MessageFrame {
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut bytes = self.id.to_le_bytes().to_vec();
-        bytes.extend_from_slice(&self.data.len().to_le_bytes());
+        bytes.extend_from_slice(&((self.data.len() as u32).to_le_bytes()));
         bytes.extend_from_slice(&self.data);
         bytes
     }

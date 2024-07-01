@@ -3,7 +3,7 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
-use log::{error, info};
+use log::{debug, error, info};
 
 use headlight_if::Message;
 use headlight_if::MessageFrame;
@@ -28,12 +28,19 @@ impl ServiceClient {
         if let Err(err) = self.stream.read_exact(&mut id_buff) {
             error!("Failed to read message id: {:?}", err);
             return Message::Invalid;
+        } else {
+            debug!("Received message id: {:?}", u32::from_le_bytes(id_buff));
         }
 
         let mut len_buff: [u8; 4] = [0; 4];
         if let Err(err) = self.stream.read_exact(&mut len_buff) {
             error!("Failed to read message length: {:?}", err);
             return Message::Invalid;
+        } else {
+            debug!(
+                "Received message length: {:?}",
+                u32::from_le_bytes(len_buff)
+            );
         }
 
         let len = u32::from_le_bytes(len_buff);
@@ -41,14 +48,18 @@ impl ServiceClient {
         if let Err(err) = self.stream.read_exact(&mut data_buff) {
             error!("Failed to read message data");
             return Message::Invalid;
-        };
+        } else {
+            debug!("Received message data: {:?}", data_buff);
+        }
 
         MessageFrame::new(u32::from_le_bytes(id_buff), data_buff).into()
     }
 
     pub fn send_message(&mut self, message: Message) {
+        let bytes = &MessageFrame::from(message).get_bytes();
+        debug!("Sending message: {:?}", bytes);
         self.stream
-            .write_all(&MessageFrame::from(message).get_bytes())
+            .write_all(bytes)
             .expect("Failed to send message");
     }
 }

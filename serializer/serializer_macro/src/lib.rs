@@ -46,6 +46,7 @@ fn impl_serializable_macro(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
             fn get_bytes(&self) -> Vec<u8> {
                 let mut data = Vec::<u8>::new();
                 #(#serializing_fields)*
+                println!("Serialized data: {:?}", data);
                 data
             }
 
