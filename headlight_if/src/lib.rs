@@ -1,5 +1,14 @@
+use std::{default, sync::Mutex};
+
 use log::{error, info};
 use serializer::Serializable;
+
+#[derive(Serializable, Default, Debug)]
+pub enum Dupa {
+    #[default]
+    Asd,
+    SSD(String),
+}
 
 #[derive(Serializable, Default, Debug)]
 pub struct EchoMessage {
