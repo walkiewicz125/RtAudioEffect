@@ -1,19 +1,11 @@
-extern crate serializer_macro;
+pub mod WireData {
+    use crate::{DataView, Serializable};
 
-pub trait WireDataSerializer {
-    fn get_bytes(&self) -> Vec<u8>;
-    fn from_bytes(data_view: &mut DataView) -> Result<Self, String>
-    where
-        Self: Sized;
-}
-
-pub struct WireData {}
-impl WireData {
-    pub fn get_bytes<T: WireDataSerializer>(value: T) -> Vec<u8> {
+    pub fn get_bytes<T: Serializable>(value: T) -> Vec<u8> {
         value.get_bytes()
     }
 
-    pub fn from_bytes<T: WireDataSerializer>(bytes: Vec<u8>) -> Result<T, String> {
+    pub fn from_bytes<T: Serializable>(bytes: Vec<u8>) -> Result<T, String> {
         let mut view = DataView::new(bytes);
         let ret = T::from_bytes(&mut view);
 
@@ -35,8 +27,16 @@ impl WireData {
         }
     }
 }
+extern crate serializer_macro;
 
-pub struct DataView {
+trait Serializable {
+    fn get_bytes(&self) -> Vec<u8>;
+    fn from_bytes(data_view: &mut DataView) -> Result<Self, String>
+    where
+        Self: Sized;
+}
+
+struct DataView {
     bytes: Vec<u8>,
     position: usize,
 }
@@ -75,7 +75,7 @@ impl DataView {
 macro_rules! impl_packet_buildable_for_trivial {
     ($($t:ty),*) => {
         $(
-            impl WireDataSerializer for $t {
+            impl Serializable for $t {
                 fn get_bytes(&self) -> Vec<u8> {
                     self.to_ne_bytes().to_vec()
                 }
@@ -92,7 +92,7 @@ macro_rules! impl_packet_buildable_for_trivial {
 
 impl_packet_buildable_for_trivial!(i8, u8, i16, u16, i32, u32, i64, u64, f32, f64);
 
-impl WireDataSerializer for String {
+impl Serializable for String {
     // [len: LE u32; str: [u8]]
     fn get_bytes(&self) -> Vec<u8> {
         let mut data = (self.len() as u32).to_ne_bytes().to_vec();
