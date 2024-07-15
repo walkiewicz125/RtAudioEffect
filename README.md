@@ -2,8 +2,11 @@ Current view of the application.
 <!-- insert window.png -->
 ![image](window.png)
 
-"demo":
-https://www.youtube.com/watch?v=csQiFaLMgIg
+
+> [!CAUTION]
+> "DEMO":\
+> Epilepsy Warning:\
+> https://www.youtube.com/watch?v=csQiFaLMgIg
 
 ## What is it?
 It is an "educational" project. To learn rust on PC and ESP32.
