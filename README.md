@@ -14,17 +14,24 @@ Please don't take it as an example of good code.
 ## Realy short status
 ### Current functionality:
 #### Common:
-- Serialization/Deserialization of messages
+- Serialization/Deserialization of messages:
+- - Trivial numeric types
+  - Structs
+  - Enums:
+  - - Unit
+    - Named
+    - Unnamed
 #### PC App:
 - Calculating the spectrum of the default loopback device.
 - Rendering current spectrum
 - Saving spectrum history.
 - Rendering spectrogram
-- Serialization
+- Serialization/Deserialization of messages
 - Communication with ESP32C3
 - Sending commands
 #### ESP32C3:
 - Connection to PC App
+- Serialization/Deserialization of messages
 - Receiving/sending commands
 - WS2812 driving via PC App commands
 
