@@ -27,6 +27,7 @@ Please don't take it as an example of good code.
 - Saving spectrum history.
 - Rendering spectrogram
 - Serialization/Deserialization of messages
+- Receiving/sending commands
 - Communication with ESP32C3
 - Sending commands
 #### ESP32C3:
