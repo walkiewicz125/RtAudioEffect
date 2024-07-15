@@ -15,10 +15,10 @@ Please don't take it as an example of good code.
 ### Current functionality:
 #### Common:
 - Serialization/Deserialization of messages:
-- - Trivial numeric types
+  - Trivial numeric types
   - Structs
   - Enums:
-  - - Unit
+    - Unit
     - Named
     - Unnamed
 #### PC App:
