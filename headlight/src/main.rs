@@ -19,7 +19,8 @@ use esp_idf_svc::{
     wifi::{ClientConfiguration, Configuration, EspWifi},
 };
 use esp_idf_sys::mdns_result_t;
-use headlight_if::{EchoMessage, IdentityMessage, IdentityRequestMessage, Message, MessageFrame};
+use headlight_if::{EchoMessage, IdentityMessage, IdentityRequestMessage, Message};
+use serializer::ByteMessagePort;
 
 extern crate headlight_if;
 extern crate serializer;
@@ -130,123 +131,105 @@ fn main() {
 }
 
 struct CommandHandler {
-    stream: TcpStream,
+    message_port: ByteMessagePort<Message>,
 }
 
 impl CommandHandler {
     pub fn new(stream: TcpStream) -> Self {
-        Self { stream }
+        Self {
+            message_port: ByteMessagePort::new(stream),
+        }
     }
 
-    fn read_frame(&mut self) -> Option<MessageFrame> {
-        let mut id_buff: [u8; 4] = [0; 4];
-
-        if let Err(err) = self.stream.read_exact(&mut id_buff) {
-            println!("Failed to read id: {:?}", err);
-            return None;
+    fn recv_message(&mut self) -> Message {
+        match self.message_port.recv() {
+            Ok(message) => {
+                println!("Received message: {:?}", message);
+                return message;
+            }
+            Err(err) => {
+                println!("Failed to receive message: {:?}", err);
+                return Message::Invalid;
+            }
         }
-
-        let mut len_buff: [u8; 4] = [0; 4];
-        if let Err(err) = self.stream.read_exact(&mut len_buff) {
-            println!("Failed to read len: {:?}", err);
-            return None;
-        }
-
-        let len = u32::from_le_bytes(len_buff) as usize;
-        let mut data_buff = vec![0; len];
-        if let Err(err) = self.stream.read_exact(&mut data_buff) {
-            println!("Failed to read data: {:?}", err);
-            return None;
-        }
-
-        Some(MessageFrame::new(u32::from_le_bytes(id_buff), data_buff))
     }
 
-    fn write_frame(&mut self, frame: MessageFrame) -> Option<()> {
-        if let Err(err) = self.stream.write_all(&frame.get_bytes()) {
-            println!("Failed to write frame: {:?}", err);
-            return None;
+    pub fn send_message(&mut self, message: Message) -> Result<(), String> {
+        println!("Sending message: {:?}", message);
+        if let Err(err) = self.message_port.send(message) {
+            println!("Failed to send message: {:?}", err);
+            return Err(err.to_string());
         }
 
-        Some(())
+        Ok(())
     }
 
     pub fn handle<F>(&mut self, mut callback: F) -> Option<()>
     where
         F: FnMut(&Message) -> Option<()>,
     {
-        match self.read_frame() {
-            Some(frame) => {
-                let message = frame.into();
-                match &message {
-                    Message::Invalid => {
-                        println!("Invalid message");
-                        return callback(&message);
-                    }
-
-                    Message::Ack => {
-                        println!("Ack not implemented");
-                        return callback(&message);
-                    }
-
-                    Message::Echo(echo_message) => match self.handle_echo(&echo_message) {
-                        Some(_) => {
-                            println!("Echo handled");
-                            return callback(&message);
-                        }
-                        None => {
-                            println!("Failed to handle echo");
-                            return None;
-                        }
-                    },
-
-                    Message::EchoReply(_) => {
-                        println!("EchoReply not implemented");
-                        return callback(&message);
-                    }
-
-                    Message::IdentityRequest(request) => {
-                        match self.handle_identity_request(&request) {
-                            Some(_) => {
-                                println!("Identity handled");
-                                return callback(&message);
-                            }
-                            None => {
-                                println!("Failed to handle identity");
-                                return None;
-                            }
-                        }
-                    }
-
-                    Message::Identity(_) => {
-                        println!("Identity not implemented");
-                        return callback(&message);
-                    }
-
-                    Message::SetColor(_) => {
-                        println!("Calling callback for SetColor");
-                        return callback(&message);
-                    }
-                };
+        let message = self.recv_message();
+        match &message {
+            Message::Invalid => {
+                println!("Invalid message");
+                return callback(&message);
             }
-            None => {
-                println!("Failed to read frame");
-                return None;
+
+            Message::Ack => {
+                println!("Ack not implemented");
+                return callback(&message);
             }
-        }
+
+            Message::Echo(echo_message) => match self.handle_echo(&echo_message) {
+                Ok(_) => {
+                    println!("Echo handled");
+                    return callback(&message);
+                }
+                Err(err) => {
+                    println!("Failed to handle echo: {:?}", err);
+                    return None;
+                }
+            },
+
+            Message::EchoReply(_) => {
+                println!("EchoReply not implemented");
+                return callback(&message);
+            }
+
+            Message::IdentityRequest(request) => match self.handle_identity_request(&request) {
+                Ok(_) => {
+                    println!("Identity handled");
+                    return callback(&message);
+                }
+                Err(err) => {
+                    println!("Failed to handle identity: {:?}", err);
+                    return None;
+                }
+            },
+
+            Message::Identity(_) => {
+                println!("Identity not implemented");
+                return callback(&message);
+            }
+
+            Message::SetColor(_) => {
+                println!("Calling callback for SetColor");
+                return callback(&message);
+            }
+        };
     }
 
-    fn handle_echo(&mut self, echo_message: &EchoMessage) -> Option<()> {
+    fn handle_echo(&mut self, echo_message: &EchoMessage) -> Result<(), String> {
         println!("Echo: {:?}", echo_message.message);
 
         let reply = Message::EchoReply(EchoMessage {
             message: format!("Reply: {}", echo_message.message),
         });
 
-        self.write_frame(reply.into())
+        self.send_message(reply)
     }
 
-    fn handle_identity_request(&mut self, request: &IdentityRequestMessage) -> Option<()> {
+    fn handle_identity_request(&mut self, request: &IdentityRequestMessage) -> Result<(), String> {
         let _ = request;
         println!("Identity Request");
 
@@ -255,7 +238,7 @@ impl CommandHandler {
             effect_id: 0,
         });
 
-        self.write_frame(identity.into())
+        self.send_message(identity)
     }
 }
 
