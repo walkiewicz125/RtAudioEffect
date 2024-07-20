@@ -2,3 +2,7 @@ headlight/target/
 headlight/.embuild/
 headlight_if/target/
 serializer/target/
+serializer/Cargo.lock
+headlight_if/Cargo.lock
+rt_audio_effect/Cargo.lock
+headlight/Cargo.lock
