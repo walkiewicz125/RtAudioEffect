@@ -1,26 +1,24 @@
 extern crate proc_macro;
 
-#[proc_macro_derive(Serializable)]
-pub fn serializable_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(ByteMessage)]
+pub fn byte_message_macro_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse(input).unwrap();
 
     // Build the trait implementation
-    serializable_impl::impl_serializable_macro(&ast)
+    byte_message_impl::impl_byte_message_macro(&ast)
 }
 
-mod serializable_impl {
+mod byte_message_impl {
     extern crate proc_macro2;
-    use std::mem::Discriminant;
 
     use proc_macro2::TokenStream;
     use quote::quote;
     use syn::{spanned::Spanned, Error};
 
-    pub fn impl_serializable_macro(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
+    pub fn impl_byte_message_macro(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
         let name = &ast.ident;
 
         let mut code = SerializingCode::empty();
-
         match &ast.data {
             syn::Data::Struct(data_struct) => match impl_struct(data_struct) {
                 Ok(serializing_code) => {
@@ -38,8 +36,10 @@ mod serializable_impl {
                     return e.into_compile_error().into();
                 }
             },
-            syn::Data::Union(data_union) => {
-                panic!("Unions are not supported");
+            syn::Data::Union(_) => {
+                return syn::Error::new(ast.span(), "Unions are not supported")
+                    .into_compile_error()
+                    .into();
             }
         }
 
@@ -47,7 +47,7 @@ mod serializable_impl {
         let deserializing_fields = code.deserialize;
 
         let generator = quote! {
-            impl Serializable for #name {
+            impl ByteMessage for #name {
                 fn to_bytes(&self) -> Vec<u8> {
                     let mut data = Vec::<u8>::new();
                     #(#serializing_fields)*

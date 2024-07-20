@@ -3,15 +3,10 @@ mod audio_analyzer;
 mod logger;
 mod ui;
 
-use audio_analyzer::StreamAnalyzerReceiver;
-use egui::Color32;
 use egui_glfw::AppWindow;
 use log::{error, info};
-use mdns_sd::{ServiceDaemon, ServiceInfo};
 use service::AudioHeadlightService;
 use std::{
-    io::{BufRead, BufReader},
-    net::TcpStream,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -113,11 +108,10 @@ impl AppContext {
         self.audio_stream.lock().unwrap().start();
 
         let mut last_time = std::time::Instant::now();
-        let mut elapsed_time = std::time::Duration::from_secs_f32(0.0);
         let mut filtered_elapsed_time = std::time::Duration::from_secs_f32(0.0);
 
         while !self.app_window.window.should_close() {
-            elapsed_time = last_time.elapsed();
+            let elapsed_time = last_time.elapsed();
             last_time = std::time::Instant::now();
 
             filtered_elapsed_time =

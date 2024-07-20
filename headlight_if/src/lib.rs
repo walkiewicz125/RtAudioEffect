@@ -1,12 +1,17 @@
-use log::{error, info};
-use serializer::Serializable;
+use std::{
+    fmt::Debug,
+    io::{Read, Write},
+    net::TcpStream,
+};
 
-#[derive(Serializable, Default, Debug)]
+use serializer::ByteMessage;
+
+#[derive(ByteMessage, Default, Debug)]
 pub struct EchoMessage {
     pub message: String,
 }
 
-#[derive(Serializable, Default, Debug)]
+#[derive(ByteMessage, Default, Debug)]
 pub struct IdentityMessage {
     pub info: String,
     pub effect_id: u8,
@@ -17,17 +22,17 @@ impl IdentityMessage {
     const BASS: u8 = 1;
 }
 
-#[derive(Serializable, Default, Debug)]
+#[derive(ByteMessage, Default, Debug)]
 pub struct IdentityRequestMessage {}
 
-#[derive(Serializable, Default, Debug)]
+#[derive(ByteMessage, Default, Debug)]
 pub struct SetColorMessage {
     pub r: u8,
     pub g: u8,
     pub b: u8,
 }
 
-#[derive(Serializable, Debug, Default)]
+#[derive(ByteMessage, Debug, Default)]
 pub enum Message {
     #[default]
     Invalid,

@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use log::info;
+use log::{error, info};
 use mdns_sd::ServiceInfo;
 
 use super::ServiceClient;
@@ -46,6 +46,20 @@ impl AudioHeadlightService {
         }
     }
 
+    fn handle_message(message: Message, last_client: &mut ServiceClient) {
+        match message {
+            Message::Echo(msg) => {
+                info!("Received Echo: {:?}", msg);
+                if let Err(err) = last_client.send_message(Message::EchoReply(msg)) {
+                    error!("Failed to send EchoReply: {}", err);
+                } else {
+                    info!("Sent EchoReply");
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn listning_thread(shared_ctx: Arc<Mutex<ServiceSharedCtx>>) {
         while shared_ctx.lock().unwrap().is_alive {
             let conn = shared_ctx.lock().unwrap().listner.accept();
@@ -56,13 +70,13 @@ impl AudioHeadlightService {
                     shared_ctx.clients.push(ServiceClient::new((stream, addr)));
 
                     let last_client = shared_ctx.clients.last_mut().unwrap();
-                    let msg = last_client.recv_message();
-                    match msg {
-                        Message::Echo(msg) => {
-                            info!("Received Echo: {:?}", msg);
-                            last_client.send_message(Message::EchoReply(msg));
+                    match last_client.recv_message() {
+                        Ok(message) => {
+                            Self::handle_message(message, last_client);
                         }
-                        _ => {}
+                        Err(err) => {
+                            error!("Failed to receive message: {}", err);
+                        }
                     }
                 }
                 Err(_) => {

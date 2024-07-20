@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test_combined {
-    use crate::Serializable;
+    use crate::ByteMessage;
 
-    #[derive(Default, Serializable, Debug, PartialEq, Clone)]
+    #[derive(Default, ByteMessage, Debug, PartialEq, Clone)]
     enum TestE {
         #[default]
         A,
@@ -10,7 +10,7 @@ mod test_combined {
         C(u32, String, u8),
         D(String),
     }
-    #[derive(Default, Serializable, Debug, PartialEq)]
+    #[derive(Default, ByteMessage, Debug, PartialEq)]
     struct TestS {
         a: String,
         b: String,
@@ -39,16 +39,16 @@ mod test_combined {
 
 #[cfg(test)]
 mod test_struct {
-    use crate::Serializable;
+    use crate::ByteMessage;
 
-    #[derive(Default, Serializable, Debug, PartialEq)]
+    #[derive(Default, ByteMessage, Debug, PartialEq)]
     struct TestSInner {
         a: String,
         b: String,
         c: u32,
     }
 
-    #[derive(Default, Serializable, Debug, PartialEq)]
+    #[derive(Default, ByteMessage, Debug, PartialEq)]
     struct TestS {
         a: String,
         b: String,
@@ -81,9 +81,9 @@ mod test_struct {
 
 #[cfg(test)]
 mod test_enum_unnamed {
-    use crate::Serializable;
+    use crate::ByteMessage;
 
-    #[derive(Default, Serializable, Debug, PartialEq, Clone)]
+    #[derive(Default, ByteMessage, Debug, PartialEq, Clone)]
     enum TestE {
         #[default]
         A,
@@ -170,9 +170,9 @@ mod test_enum_unnamed {
 
 #[cfg(test)]
 mod test_enum_named {
-    use crate::Serializable;
+    use crate::ByteMessage;
 
-    #[derive(Default, Serializable, Debug, PartialEq, Clone)]
+    #[derive(Default, ByteMessage, Debug, PartialEq, Clone)]
     enum TestE {
         #[default]
         A,
