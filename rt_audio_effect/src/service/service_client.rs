@@ -6,7 +6,7 @@ use std::{
 use log::{debug, error, info};
 
 use headlight_if::Message;
-use headlight_if::MessageFrame;
+use serializer::Serializable;
 
 pub struct ServiceClient {
     pub stream: TcpStream,
@@ -46,20 +46,27 @@ impl ServiceClient {
         let len = u32::from_le_bytes(len_buff);
         let mut data_buff = vec![0; len as usize];
         if let Err(err) = self.stream.read_exact(&mut data_buff) {
-            error!("Failed to read message data");
+            error!("Failed to read message data: {:?}", err);
             return Message::Invalid;
         } else {
             debug!("Received message data: {:?}", data_buff);
         }
 
-        MessageFrame::new(u32::from_le_bytes(id_buff), data_buff).into()
+        match Message::try_from(data_buff) {
+            Ok(message) => return message,
+            Err(err) => {
+                error!("Failed to parse message: {:?}", err);
+                return Message::Invalid;
+            }
+        }
     }
 
     pub fn send_message(&mut self, message: Message) {
-        let bytes = &MessageFrame::from(message).get_bytes();
-        debug!("Sending message: {:?}", bytes);
+        debug!("Sending message: {:?}", message);
+
+        let bytes: Vec<u8> = message.into();
         self.stream
-            .write_all(bytes)
+            .write_all(bytes.as_slice())
             .expect("Failed to send message");
     }
 }

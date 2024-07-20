@@ -26,8 +26,12 @@ impl Serializable for String {
                 bytes.len(),
             ));
         }
-        let size = u32::from_ne_bytes(bytes[0..4].try_into().map_err(|e| format!("Error parsing bytes: {}", e))?);
-        *self = String::from_utf8(bytes[4..4+size as usize].to_vec())
+        let size = u32::from_ne_bytes(
+            bytes[0..4]
+                .try_into()
+                .map_err(|e| format!("Error parsing bytes: {}", e))?,
+        );
+        *self = String::from_utf8(bytes[4..4 + size as usize].to_vec())
             .map_err(|e| format!("Error parsing string: {}", e))?;
         Ok(4 + self.len() as u32)
     }
