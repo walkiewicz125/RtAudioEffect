@@ -32,6 +32,12 @@ pub struct SetColorMessage {
     pub b: u8,
 }
 
+#[derive(ByteMessage, Default, Debug)]
+pub struct SetServo {
+    pub id: u8,
+    pub position: f32,
+}
+
 #[derive(ByteMessage, Debug, Default)]
 pub enum Message {
     #[default]
@@ -42,6 +48,7 @@ pub enum Message {
     IdentityRequest(IdentityRequestMessage),
     Identity(IdentityMessage),
     SetColor(SetColorMessage),
+    SetServo(SetServo),
 }
 
 impl TryFrom<Vec<u8>> for Message {
