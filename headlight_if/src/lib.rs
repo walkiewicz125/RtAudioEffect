@@ -1,9 +1,3 @@
-use std::{
-    fmt::Debug,
-    io::{Read, Write},
-    net::TcpStream,
-};
-
 use serializer::ByteMessage;
 
 #[derive(ByteMessage, Default, Debug)]
@@ -15,11 +9,6 @@ pub struct EchoMessage {
 pub struct IdentityMessage {
     pub info: String,
     pub effect_id: u8,
-}
-
-impl IdentityMessage {
-    const INVALID: u8 = 0;
-    const BASS: u8 = 1;
 }
 
 #[derive(ByteMessage, Default, Debug)]

@@ -18,7 +18,7 @@ mod byte_message_impl {
     pub fn impl_byte_message_macro(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
         let name = &ast.ident;
 
-        let mut code = SerializingCode::empty();
+        let code;
         match &ast.data {
             syn::Data::Struct(data_struct) => match impl_struct(data_struct) {
                 Ok(serializing_code) => {

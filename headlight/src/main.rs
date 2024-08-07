@@ -1,26 +1,21 @@
-use std::{
-    any::Any,
-    collections::binary_heap::IntoIter,
-    io::{Read, Write},
-    net::{Ipv4Addr, TcpStream},
-    thread::sleep,
-    time::Duration,
-};
-
+use std::{net::TcpStream, thread::sleep, time::Duration};
+mod servo;
 use esp_idf_hal::{
     delay::FreeRtos,
+    ledc::{self, config::TimerConfig},
     peripherals::Peripherals,
     rmt::{FixedLengthSignal, PinState, Pulse, TxRmtConfig, TxRmtDriver},
+    units::Hertz,
 };
 use esp_idf_svc::{
     eventloop::EspSystemEventLoop,
-    mdns::{EspMdns, Interface, Protocol, QueryResult, Type},
+    mdns::{EspMdns, Interface, Protocol, QueryResult},
     nvs::EspDefaultNvsPartition,
     wifi::{ClientConfiguration, Configuration, EspWifi},
 };
-use esp_idf_sys::mdns_result_t;
 use headlight_if::{EchoMessage, IdentityMessage, IdentityRequestMessage, Message};
 use serializer::ByteMessagePort;
+use servo::*;
 
 extern crate headlight_if;
 extern crate serializer;
@@ -113,6 +108,23 @@ fn main() {
 
     let mut handler = CommandHandler::new(stream);
 
+    let timer_driver = ledc::LedcTimerDriver::new(
+        peripherals.ledc.timer0,
+        &TimerConfig::default()
+            .frequency(Hertz(50))
+            .resolution(ledc::Resolution::Bits14),
+    )
+    .unwrap();
+
+    let mut servo1 = Servo::new(
+        &timer_driver,
+        peripherals.ledc.channel0,
+        peripherals.pins.gpio7,
+    )
+    .unwrap();
+
+    servo1.set_duty(0.5).unwrap();
+
     loop {
         handler.handle(|message| {
             println!("Command callback: {:?}", message);
@@ -122,7 +134,13 @@ fn main() {
                     let rgb = Rgb::new(set_color.r, set_color.g, set_color.b);
                     neopixel(rgb, &mut tx).unwrap();
                 }
-                _ => {}
+                Message::SetServo(set_servo) => {
+                    let duty = set_servo.position;
+                    servo1.set_duty(duty).unwrap();
+                }
+                _ => {
+                    println!("Unhandled message: {:?}", message);
+                }
             }
 
             Some(())
@@ -191,11 +209,6 @@ impl CommandHandler {
                 }
             },
 
-            Message::EchoReply(_) => {
-                println!("EchoReply not implemented");
-                return callback(&message);
-            }
-
             Message::IdentityRequest(request) => match self.handle_identity_request(&request) {
                 Ok(_) => {
                     println!("Identity handled");
@@ -207,13 +220,11 @@ impl CommandHandler {
                 }
             },
 
-            Message::Identity(_) => {
-                println!("Identity not implemented");
-                return callback(&message);
-            }
-
-            Message::SetColor(_) => {
-                println!("Calling callback for SetColor");
+            _ => {
+                println!(
+                    "Unhandled message by handler: {:?}. Calling callback",
+                    message
+                );
                 return callback(&message);
             }
         };
