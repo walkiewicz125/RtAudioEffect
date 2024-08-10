@@ -2,7 +2,7 @@ use std::{
     net::TcpListener,
     sync::{Arc, Mutex},
     thread::{sleep, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use log::{error, info};
@@ -10,7 +10,7 @@ use mdns_sd::ServiceInfo;
 
 use super::ServiceClient;
 
-use headlight_if::{Message, SetColorMessage};
+use headlight_if::{Message, SetColorMessage, SetServo};
 
 struct ServiceSharedCtx {
     is_alive: bool,
@@ -24,6 +24,7 @@ pub struct AudioHeadlightService {
     shared_ctx: Arc<Mutex<ServiceSharedCtx>>,
     listner_thread: Option<JoinHandle<()>>,
     rainbow_thread: Option<JoinHandle<()>>,
+    servo_thread: Option<JoinHandle<()>>,
 }
 
 impl AudioHeadlightService {
@@ -43,6 +44,7 @@ impl AudioHeadlightService {
             })),
             listner_thread: None,
             rainbow_thread: None,
+            servo_thread: None,
         }
     }
 
@@ -91,17 +93,39 @@ impl AudioHeadlightService {
         while shared_ctx.lock().unwrap().is_alive {
             let rgb = Rgb::from_hsv(hue, 100, 100);
             for client in shared_ctx.lock().unwrap().clients.iter_mut() {
-                client.send_message(Message::SetColor(SetColorMessage {
-                    r: rgb.r,
-                    g: rgb.g,
-                    b: rgb.b,
-                }));
+                client
+                    .send_message(Message::SetColor(SetColorMessage {
+                        r: rgb.r,
+                        g: rgb.g,
+                        b: rgb.b,
+                    }))
+                    .unwrap();
             }
             hue = (hue + 1) % 360;
             sleep(Duration::from_millis(30));
         }
     }
-
+    fn servo_thread(shared_ctx: Arc<Mutex<ServiceSharedCtx>>) {
+        let dt = 0.01;
+        let mut time = 0.0;
+        let mut timer = Instant::now();
+        while shared_ctx.lock().unwrap().is_alive {
+            // generate sin wave
+            let elapsed = timer.elapsed();
+            timer = Instant::now();
+            time += elapsed.as_secs_f32();
+            let pos = ((2.0 * std::f32::consts::PI) * (time / 1.0)).sin();
+            for client in shared_ctx.lock().unwrap().clients.iter_mut() {
+                client
+                    .send_message(Message::SetServo(SetServo {
+                        id: 0,
+                        position: pos,
+                    }))
+                    .unwrap();
+            }
+            sleep(Duration::from_secs_f32(dt));
+        }
+    }
     pub fn start(&mut self) {
         if let None = self.listner_thread {
             let shared_ctx = self.shared_ctx.clone();
@@ -114,6 +138,13 @@ impl AudioHeadlightService {
             let shared_ctx = self.shared_ctx.clone();
             self.rainbow_thread = Some(std::thread::spawn(move || {
                 Self::rainbow_thread(shared_ctx);
+            }));
+        }
+
+        if let None = self.servo_thread {
+            let shared_ctx = self.shared_ctx.clone();
+            self.servo_thread = Some(std::thread::spawn(move || {
+                Self::servo_thread(shared_ctx);
             }));
         }
     }

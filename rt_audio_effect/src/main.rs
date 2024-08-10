@@ -30,7 +30,7 @@ fn main() {
     info!("Hello RtAudioEffect!");
 
     if let Err(err) =
-        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug))
+        log::set_logger(&logger::LOGGER).map(|()| log::set_max_level(log::LevelFilter::Info))
     {
         eprintln!("log::set_logger failed: {err:#?}");
     }
