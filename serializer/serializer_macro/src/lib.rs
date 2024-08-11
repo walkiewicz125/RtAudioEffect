@@ -18,7 +18,9 @@ pub fn byte_message_macro_derive(input: proc_macro::TokenStream) -> proc_macro::
             );
             return tokens;
         }
-        Err(e) => e.to_compile_error().into(),
+        Err(e) => {
+            return e.to_compile_error().into();
+        }
     }
 }
 
@@ -40,8 +42,7 @@ mod byte_message_impl {
     pub fn impl_byte_message_macro(
         ast: &syn::DeriveInput,
     ) -> Result<proc_macro::TokenStream, Error> {
-        let name = &ast.ident;
-
+        let type_name = &ast.ident;
         let serializer_code: SerializerCode;
 
         match &ast.data {
@@ -49,7 +50,7 @@ mod byte_message_impl {
                 serializer_code = impl_struct(data_struct)?;
             }
             Data::Enum(data_enum) => {
-                serializer_code = impl_enum(name, data_enum)?;
+                serializer_code = impl_enum(type_name, data_enum)?;
             }
             Data::Union(_) => {
                 return Err(Error::new(ast.span(), "Unions are not supported"));
@@ -92,7 +93,7 @@ mod byte_message_impl {
         let (serializing, deserializing) = serializer_code;
 
         let generator = quote! {
-            impl ByteMessage for #name {
+            impl ByteMessage for #type_name {
                 fn to_bytes(&self) -> Vec<u8> {
                     let mut data = Vec::<u8>::new();
                     #serializing
