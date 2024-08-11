@@ -15,7 +15,9 @@ impl Spectrum {
     pub fn as_slice(&self) -> &[f32] {
         &self.0
     }
-
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
     pub fn new() -> Self {
         Spectrum(Vec::new())
     }

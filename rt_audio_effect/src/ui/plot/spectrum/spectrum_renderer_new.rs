@@ -1,6 +1,6 @@
-use std::{mem::size_of, time::Duration};
+use std::time::Duration;
 
-use glam::{Mat4, Vec2, Vec3, Vec4};
+use glam::{Mat4, Vec2};
 use glamour::Matrix4;
 
 use crate::{
@@ -8,7 +8,6 @@ use crate::{
     ui::plot::details::{
         shader_program::ShaderProgram, storage_buffer::StorageBufferArray,
         uniform_buffer::UniformBuffer, vertex_array::VertexArray,
-        vertex_attribute::VertexAttribute, vertex_buffer::VertexBuffer,
     },
 };
 
@@ -20,7 +19,6 @@ pub struct SpectrumRenderer {
     shader: ShaderProgram,
     // vertex array
     vertex_array: VertexArray,
-    vertices_buffer: VertexBuffer<Vec2>,
     // uniforms
     min_max_values: UniformBuffer,
     client_size: UniformBuffer,
@@ -33,26 +31,11 @@ pub struct SpectrumRenderer {
 }
 
 impl SpectrumRenderer {
-    const VERTICES_ATTRIBUTES: [VertexAttribute; 1] = [VertexAttribute::new(
-        Self::VERTICES_BINDING_POINT,
-        2,
-        size_of::<Vec2>() as i32,
-        0,
-        0,
-    )];
-    const MAGNITUDE_ATTRIBUTES: [VertexAttribute; 1] = [VertexAttribute::new(
-        Self::MAGNITUDES_BINDING_POINT,
-        1,
-        size_of::<f32>() as i32,
-        0,
-        1,
-    )];
-
     pub fn new(bar_segments: u32) -> Self {
         if bar_segments < 1 {
             panic!("BarPlotConfig.bar_segments must be greater than 0");
         }
-        if bar_segments % 2 != 0 {
+        if bar_segments % 2 == 0 {
             panic!("BarPlotConfig.bar_segments must be even");
         }
 
@@ -60,27 +43,21 @@ impl SpectrumRenderer {
             .expect("Failed to create SpectrumRenderer ShaderProgram");
 
         let vertex_array = VertexArray::new();
-        let min_max_values = UniformBuffer::new_for::<Vec4>();
+        let min_max_values = UniformBuffer::new_for::<Vec2>();
         let client_size = UniformBuffer::new_for::<Vec2>();
         let view_matrix = UniformBuffer::new_for::<Mat4>();
 
         let magnitudes = StorageBufferArray::new();
         let magnitudes2 = StorageBufferArray::new();
         let magnitudes3 = StorageBufferArray::new();
-        let mut shaper = StorageBufferArray::new();
-        let bar_shaper = Self::generate_shaper(bar_segments);
-        vertex_array.bind();
-        shaper.store_array(bar_shaper.as_slice());
+        let shaper = StorageBufferArray::new();
 
-        let vertices = Self::generate_vertices(bar_segments);
-        let vertices_buffer = Self::generate_vertices_buffer(&vertices);
         Self {
-            vertices,
-            bar_shaper,
+            vertices: Self::generate_vertices(bar_segments),
+            bar_shaper: Self::generate_shaper(bar_segments),
             spectrums: None,
             shader,
             vertex_array,
-            vertices_buffer,
             min_max_values,
             client_size,
             view_matrix,
@@ -89,10 +66,6 @@ impl SpectrumRenderer {
             magnitudes3,
             shaper,
         }
-    }
-
-    fn generate_vertices_buffer(vertices: &Vec<Vec2>) -> VertexBuffer<Vec2> {
-        VertexBuffer::new(Self::VERTICES_ATTRIBUTES.to_vec(), &vertices)
     }
 
     fn exp_decay(start: f32, end: f32, half_life: f32, time_step: f32) -> f32 {
@@ -139,95 +112,15 @@ impl SpectrumRenderer {
     }
 
     pub fn render(&mut self) {
+        self.shader.enable();
+        self.vertex_array.bind();
+
+        self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
+        self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
+
         if self.spectrums.is_none() {
             return;
         }
-
-        self.shader.enable();
-        self.vertex_array.bind();
-        self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
-        self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
-        self.shaper.bind(Self::SHAPER_BUFFER_BINDING_POINT);
-
-        self.vertices_buffer.bind();
-        self.vertices_buffer.buffer_data(self.vertices.as_slice());
-
-        let (last, mean, peek) = self.spectrums.as_ref().unwrap();
-
-        // render mean_spectrum
-        self.magnitudes2.bind(Self::MAGNITUDES_BINDING_POINT);
-        self.magnitudes2.store_array(mean.as_slice());
-        let min = mean.into_iter().cloned().reduce(f32::min).unwrap();
-        let max = mean.into_iter().cloned().reduce(f32::max).unwrap() * 0.9;
-        self.min_max_values.buffer_subdata(&Vec2::new(min, max), 0);
-        self.min_max_values
-            .buffer_subdata(&(mean.len() as u32), size_of::<Vec2>() as isize);
-        self.min_max_values
-            .buffer_subdata(&(1.0f32), size_of::<Vec3>() as isize);
-        self.min_max_values.bind(Self::MIN_MAX_BINDING_POINT);
-        unsafe {
-            gl::BlendColor(0.00, 0.1, 0.01, 1.00);
-            gl::BlendFunc(gl::CONSTANT_COLOR, gl::DST_ALPHA);
-            gl::DrawArraysInstanced(
-                gl::TRIANGLE_STRIP,
-                0,
-                self.vertices.len() as i32,
-                self.magnitudes2.len() - 1,
-            );
-        }
-
-        // render peek_slow_falling spectrum
-        self.magnitudes3.bind(Self::MAGNITUDES_BINDING_POINT);
-        self.magnitudes3.store_array(peek.as_slice());
-        let min = peek.into_iter().cloned().reduce(f32::min).unwrap();
-        let max = peek.into_iter().cloned().reduce(f32::max).unwrap() * 0.9;
-        self.min_max_values.buffer_subdata(&Vec2::new(min, max), 0);
-        self.min_max_values
-            .buffer_subdata(&(peek.len() as u32), size_of::<Vec2>() as isize);
-        self.min_max_values
-            .buffer_subdata(&(1.05f32), size_of::<Vec3>() as isize);
-        self.min_max_values.bind(Self::MIN_MAX_BINDING_POINT);
-        unsafe {
-            gl::BlendColor(0.5, 0.005, 0.0, 1.0);
-            gl::BlendFunc(gl::CONSTANT_COLOR, gl::DST_ALPHA);
-            gl::DrawArraysInstanced(
-                gl::TRIANGLE_STRIP,
-                0,
-                self.vertices.len() as i32,
-                self.magnitudes3.len() - 1,
-            );
-        }
-        // render current spectrum
-        self.magnitudes.bind(Self::MAGNITUDES_BINDING_POINT);
-        self.magnitudes.store_array(last.as_slice());
-        let min = last.into_iter().cloned().reduce(f32::min).unwrap();
-        let max = last.into_iter().cloned().reduce(f32::max).unwrap();
-        self.min_max_values.buffer_subdata(&Vec2::new(min, max), 0);
-        self.min_max_values
-            .buffer_subdata(&(last.len() as u32), size_of::<Vec2>() as isize);
-        self.min_max_values
-            .buffer_subdata(&(1.0f32), size_of::<Vec3>() as isize);
-        self.min_max_values.bind(Self::MIN_MAX_BINDING_POINT);
-        unsafe {
-            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
-            gl::DrawArraysInstanced(
-                gl::TRIANGLE_STRIP,
-                0,
-                self.vertices.len() as i32,
-                self.magnitudes.len() - 1,
-            );
-        }
-
-        self.vertex_array.unbind();
-        self.shader.disable();
-    }
-
-    pub fn render2(&mut self) {
-        self.shader.enable();
-        self.vertex_array.bind();
-
-        self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
-        self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
 
         let (last, mean, peek) = self.spectrums.as_ref().unwrap();
 
@@ -235,7 +128,7 @@ impl SpectrumRenderer {
         let min = mean.into_iter().cloned().reduce(f32::min).unwrap();
         let max = mean.into_iter().cloned().reduce(f32::max).unwrap();
         self.min_max_values.buffer_subdata(&Vec2::new(min, max), 0);
-        self.magnitudes2.bind(Self::MAGNITUDES_BINDING_POINT);
+        self.magnitudes2.bind(Self::MAGNITUDES_BUFFER_BINDING_POINT);
         self.min_max_values.bind(Self::MIN_MAX_BINDING_POINT);
         unsafe {
             gl::BlendColor(0.00, 0.1, 0.01, 1.00);
@@ -244,7 +137,7 @@ impl SpectrumRenderer {
                 gl::TRIANGLE_STRIP,
                 0,
                 self.vertices.len() as i32,
-                self.magnitudes2.len() - 1,
+                self.magnitudes2.len(),
             );
         }
 
@@ -252,7 +145,7 @@ impl SpectrumRenderer {
         let min = peek.into_iter().cloned().reduce(f32::min).unwrap();
         let max = peek.into_iter().cloned().reduce(f32::max).unwrap();
         self.min_max_values.buffer_subdata(&Vec2::new(min, max), 0);
-        self.magnitudes3.bind(Self::MAGNITUDES_BINDING_POINT);
+        self.magnitudes3.bind(Self::MAGNITUDES_BUFFER_BINDING_POINT);
         self.min_max_values.bind(Self::MIN_MAX_BINDING_POINT);
         unsafe {
             gl::BlendColor(0.5, 0.005, 0.0, 1.0);
@@ -261,7 +154,7 @@ impl SpectrumRenderer {
                 gl::TRIANGLE_STRIP,
                 0,
                 self.vertices.len() as i32,
-                self.magnitudes3.len() - 1,
+                self.magnitudes3.len(),
             );
         }
 
@@ -269,7 +162,7 @@ impl SpectrumRenderer {
         let min = last.into_iter().cloned().reduce(f32::min).unwrap();
         let max = last.into_iter().cloned().reduce(f32::max).unwrap();
         self.min_max_values.buffer_subdata(&Vec2::new(min, max), 0);
-        self.magnitudes.bind(Self::MAGNITUDES_BINDING_POINT);
+        self.magnitudes.bind(Self::MAGNITUDES_BUFFER_BINDING_POINT);
         self.min_max_values.bind(Self::MIN_MAX_BINDING_POINT);
         unsafe {
             gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -277,7 +170,7 @@ impl SpectrumRenderer {
                 gl::TRIANGLE_STRIP,
                 0,
                 self.vertices.len() as i32,
-                self.magnitudes.len() - 1,
+                self.magnitudes.len(),
             );
         }
 
@@ -299,23 +192,15 @@ impl SpectrumRenderer {
     }
 
     fn generate_shaper(bar_segments: u32) -> Vec<f32> {
-        let count = 1 + 2 * bar_segments as usize;
-        println!("{:?}", count);
-        let shaper = apodize::hanning_iter(count)
+        apodize::hanning_iter(1 + bar_segments as usize)
             .map(|v| v as f32)
-            .take((count + 1) / 2)
-            .inspect(|v| println!("{:?}", v))
-            .collect::<Vec<f32>>();
-
-        println!("{:?}", shaper);
-        shaper
+            .collect::<Vec<f32>>()
     }
 
     const VERTEX_SHADER: &'static str = include_str!("../resources/barplot.vert");
     const FRAGMENT_SHADER: &'static str = include_str!("../resources/basic.frag");
-    const VERTICES_BINDING_POINT: u32 = 0;
-    const MAGNITUDES_BINDING_POINT: u32 = 1;
-    const SHAPER_BUFFER_BINDING_POINT: u32 = 2;
+    const MAGNITUDES_BUFFER_BINDING_POINT: u32 = 0;
+    const SHAPER_BUFFER_BINDING_POINT: u32 = 1;
     const CLIENT_SIZE_BINDING_POINT: u32 = 1;
     const VIEW_MATRIX_BINDING_POINT: u32 = 0;
     const MIN_MAX_BINDING_POINT: u32 = 3;

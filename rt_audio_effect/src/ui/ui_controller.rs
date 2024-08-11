@@ -34,8 +34,8 @@ impl UiController {
         Self {
             audio_analyzer,
             audio_stream,
-            spectrum_renderer_left: Arc::new(Mutex::new(SpectrumRenderer::new())),
-            spectrum_renderer_right: Arc::new(Mutex::new(SpectrumRenderer::new())),
+            spectrum_renderer_left: Arc::new(Mutex::new(SpectrumRenderer::new(8))),
+            spectrum_renderer_right: Arc::new(Mutex::new(SpectrumRenderer::new(8))),
             spectrogram_renderer_left: Arc::new(Mutex::new(SpectrogramRenderer::new())),
             spectrogram_renderer_right: Arc::new(Mutex::new(SpectrogramRenderer::new())),
             heat_map,
