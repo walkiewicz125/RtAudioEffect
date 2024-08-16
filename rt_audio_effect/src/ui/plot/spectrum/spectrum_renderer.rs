@@ -2,6 +2,7 @@ use std::{mem::size_of, time::Duration};
 
 use glam::{Mat4, Vec2, Vec3, Vec4};
 use glamour::Matrix4;
+use log::info;
 
 use crate::{
     audio_analyzer::Spectrum,
@@ -14,7 +15,6 @@ use crate::{
 
 pub struct SpectrumRenderer {
     vertices: Vec<Vec2>,
-    bar_shaper: Vec<f32>,
     spectrums: Option<(Spectrum, Spectrum, Spectrum)>,
     // shader
     shader: ShaderProgram,
@@ -29,7 +29,6 @@ pub struct SpectrumRenderer {
     magnitudes: StorageBufferArray<f32>,
     magnitudes2: StorageBufferArray<f32>,
     magnitudes3: StorageBufferArray<f32>,
-    shaper: StorageBufferArray<f32>,
 }
 
 impl SpectrumRenderer {
@@ -67,16 +66,11 @@ impl SpectrumRenderer {
         let magnitudes = StorageBufferArray::new();
         let magnitudes2 = StorageBufferArray::new();
         let magnitudes3 = StorageBufferArray::new();
-        let mut shaper = StorageBufferArray::new();
-        let bar_shaper = Self::generate_shaper(bar_segments);
-        vertex_array.bind();
-        shaper.store_array(bar_shaper.as_slice());
 
         let vertices = Self::generate_vertices(bar_segments);
         let vertices_buffer = Self::generate_vertices_buffer(&vertices);
         Self {
             vertices,
-            bar_shaper,
             spectrums: None,
             shader,
             vertex_array,
@@ -87,7 +81,6 @@ impl SpectrumRenderer {
             magnitudes,
             magnitudes2,
             magnitudes3,
-            shaper,
         }
     }
 
@@ -147,7 +140,6 @@ impl SpectrumRenderer {
         self.vertex_array.bind();
         self.client_size.bind(Self::CLIENT_SIZE_BINDING_POINT);
         self.view_matrix.bind(Self::VIEW_MATRIX_BINDING_POINT);
-        self.shaper.bind(Self::SHAPER_BUFFER_BINDING_POINT);
 
         self.vertices_buffer.bind();
         self.vertices_buffer.buffer_data(self.vertices.as_slice());
@@ -298,24 +290,10 @@ impl SpectrumRenderer {
         vertices
     }
 
-    fn generate_shaper(bar_segments: u32) -> Vec<f32> {
-        let count = 1 + 2 * bar_segments as usize;
-        println!("{:?}", count);
-        let shaper = apodize::hanning_iter(count)
-            .map(|v| v as f32)
-            .take((count + 1) / 2)
-            .inspect(|v| println!("{:?}", v))
-            .collect::<Vec<f32>>();
-
-        println!("{:?}", shaper);
-        shaper
-    }
-
     const VERTEX_SHADER: &'static str = include_str!("../resources/barplot.vert");
     const FRAGMENT_SHADER: &'static str = include_str!("../resources/basic.frag");
     const VERTICES_BINDING_POINT: u32 = 0;
     const MAGNITUDES_BINDING_POINT: u32 = 1;
-    const SHAPER_BUFFER_BINDING_POINT: u32 = 2;
     const CLIENT_SIZE_BINDING_POINT: u32 = 1;
     const VIEW_MATRIX_BINDING_POINT: u32 = 0;
     const MIN_MAX_BINDING_POINT: u32 = 3;

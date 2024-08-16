@@ -19,11 +19,6 @@ layout(std140, binding = 3) uniform MinMax
   float scale;
 };
 
-layout(std430, binding = 2) buffer shaper_buffer
-{
-    uint shaper_count;
-    float[] shaper_values;
-};
 layout(std430, binding = 1) buffer magnitudes_buffer
 {
     uint magnitude_count;
@@ -48,21 +43,55 @@ float bar_width(int bar_id)
     return w;
 }
 
-vec2 calculate_vertex_for_bar(int bar_id, int vertex_id)
+float get_db_for_bar(int bar_id)
+{
+    int bar_id_checked = clamp(bar_id, 0, int(bar_count)-1);
+    return (20 / log(10)) * log(magnitudes[bar_id_checked]); // result -> db = [-inf; 0];
+}
+
+/*
+   Tension: 1 is high, 0 normal, -1 is low
+   Bias: 0 is even,
+         positive is towards first segment,
+         negative towards the other
+*/
+float HermiteInterpolate(
+    int bar_id,
+    float mu,
+    float tension,
+    float bias)
+{
+    float m0,m1,mu2,mu3;
+    float a0,a1,a2,a3;
+
+    float y0 = get_db_for_bar(bar_id-1);
+    float y1 = get_db_for_bar(bar_id);
+    float y2 = get_db_for_bar(bar_id+1);
+    float y3 = get_db_for_bar(bar_id+2);
+
+    mu2 = mu * mu;
+    mu3 = mu2 * mu;
+    m0  = (y1-y0)*(1+bias)*(1-tension)/2;
+    m0 += (y2-y1)*(1-bias)*(1-tension)/2;
+    m1  = (y2-y1)*(1+bias)*(1-tension)/2;
+    m1 += (y3-y2)*(1-bias)*(1-tension)/2;
+    a0 =  2*mu3 - 3*mu2 + 1;
+    a1 =    mu3 - 2*mu2 + mu;
+    a2 =    mu3 -   mu2;
+    a3 = -2*mu3 + 3*mu2;
+
+    return(a0*y1+a1*m0+a2*m1+a3*y2);
+}
+
+vec2 calculate_vertex(int bar_id, int vertex_id)
 {
     float x_offset = log_of_bar(bar_id) * (client_size.x);
     float vertex_x = x_offset + vertex.x * bar_width(bar_id);
 
-    float db_value_this = (20 / log(10)) * log(magnitudes[bar_id]); // result -> db = [-inf; 0];
-    float db_value_next = (20 / log(10)) * log(magnitudes[bar_id+1]); // result -> db = [-inf; 0];
-
-    float vertex_y_next = (vertex.y) * client_size.y * (1.0 + db_value_next/100.0); // result -> db = [-db/100.0; 1.0]; -> basically from 0 to -100db
-    float vertex_y_this = (vertex.y) * client_size.y * (1.0 + db_value_this/100.0); // result -> db = [-db/100.0; 1.0]; -> basically from 0 to -100db
-
-    float vertex_y = mix(vertex_y_this, vertex_y_next, shaper_values[vertex_id/2])*scale;
-
-    return vec2(vertex_x, vertex_y);
+    float intepolated_y = (vertex.y) * client_size.y * (1.0 + HermiteInterpolate(bar_id+1, vertex.x, 0.0, 0.0)/100.0) *scale; // result -> db = [-db/100.0; 1.0]; -> basically from 0 to -100db
+    return vec2(vertex_x, intepolated_y);
 }
+
 // make function to convert linear value to mix of colors 1-5
 vec4 color_map1(float value)
 {
@@ -82,19 +111,25 @@ vec4 color_map1(float value)
         return mix(color4, color5, (value - 0.75) * 4.0);
 }
 
+
+
 void main()
 {
     int bar_index = gl_InstanceID;
     int vertex_index = gl_VertexID;
 
-    vec2 vertex_pos = calculate_vertex_for_bar(bar_index, vertex_index);
+    vec2 vertex_pos = calculate_vertex(bar_index, vertex_index);
 
-    float mag_this = magnitudes[bar_index];
+    float mag_this = magnitudes[bar_index+0];
     float mag_next = magnitudes[bar_index+1];
+    float mag_next2 = magnitudes[bar_index+2];
     mag_this = clamp((mag_this - min_max.x) / (min_max.y - min_max.x), 0.0, 1.0);
     mag_next = clamp((mag_next - min_max.x) / (min_max.y - min_max.x), 0.0, 1.0);
+    mag_next2 = clamp((mag_next2 - min_max.x) / (min_max.y - min_max.x), 0.0, 1.0);
     vec4 color_this = color_map1(mag_this);
     vec4 color_next = color_map1(mag_next);
-    frag_color = mix(color_this, color_next, shaper_values[vertex_index/2]);
+    vec4 color_next2 = color_map1(mag_next2);
+
+    frag_color = mix(color_next, color_next2, vertex.x);
     gl_Position = projection * vec4(vertex_pos, 0.0, 1.0);
 }
