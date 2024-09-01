@@ -1,3 +1,3 @@
 pub mod central_panel;
-pub mod plot;
+pub mod device_states;
 pub mod ui_controller;

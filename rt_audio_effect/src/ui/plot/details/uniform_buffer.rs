@@ -39,6 +39,10 @@ impl UniformBuffer {
         }
     }
 
+    pub fn buffer<T>(&mut self, data: &T) {
+        self.buffer_subdata(data, 0);
+    }
+
     pub fn allocate(&self, size: isize) {
         unsafe {
             gl::BindBuffer(gl::UNIFORM_BUFFER, self.uniform_buffer_id);

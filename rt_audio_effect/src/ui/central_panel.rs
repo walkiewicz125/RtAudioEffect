@@ -4,16 +4,14 @@ use egui::{
     load::SizedTexture, vec2, Align, CollapsingHeader, Color32, ColorImage, Context, ImageData,
     Layout, Sense, TextureOptions, Ui, Vec2, Widget,
 };
+use egui_addons::layouts::add_columns;
 
 use crate::{audio::audio_stream::AudioStream, audio_analyzer::AudioAnalyzysProvider};
 
-use super::{
-    helpers::add_columns,
-    plot::spectrum::{
-        spectrogram_renderer::SpectrogramRenderer,
-        spectrogram_renderer_widget::SpectrogramRendererWidget,
-        spectrum_renderer::SpectrumRenderer, spectrum_renderer_widget::SprectrumRendererWidget,
-    },
+use super::plot::spectrum::{
+    spectrogram_renderer::SpectrogramRenderer,
+    spectrogram_renderer_widget::SpectrogramRendererWidget, spectrum_renderer::SpectrumRenderer,
+    spectrum_renderer_widget::SprectrumRendererWidget,
 };
 
 pub struct CentralPanel {

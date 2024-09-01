@@ -1,30 +1,26 @@
 #version 430 core
 
+layout (location = 0) in vec2 vertex;
 out vec4 frag_color;
 
-layout(std140, binding = 0) uniform Projection
+layout(std140, binding = 0) uniform RenderConfig
 {
   mat4 projection;
-};
-
-layout(std140, binding = 1) uniform ClientSize
-{
   vec2 client_size;
 };
 
-layout(std140, binding = 3) uniform MinMax
+layout(std140, binding = 1) uniform DrawConfig
 {
   vec2 min_max;
   uint bar_count;
   float scale;
 };
 
-layout(std430, binding = 1) buffer magnitudes_buffer
+layout(std430, binding = 1) buffer MagnitudesBuffer
 {
     uint magnitude_count;
     float[] magnitudes;
 };
-layout (location = 0) in vec2 vertex;
 
 // TODO: add shaper values
 // CALC segment height etc
@@ -110,8 +106,6 @@ vec4 color_map1(float value)
     else // if (value < 1.0)
         return mix(color4, color5, (value - 0.75) * 4.0);
 }
-
-
 
 void main()
 {

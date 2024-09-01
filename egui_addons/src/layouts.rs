@@ -1,34 +1,6 @@
-use egui::{vec2, Align, Layout, Rect, Ui, WidgetText};
+use egui::{vec2, Align, Layout, Rect, Ui};
 
-pub fn number_input<T>(
-    ui: &mut egui::Ui,
-    label: impl Into<WidgetText>,
-    value_text: &mut String,
-) -> Option<T>
-where
-    T: std::str::FromStr,
-{
-    let label = ui.label(label);
-    let old_value = value_text.clone();
-    let response = ui.text_edit_singleline(value_text).labelled_by(label.id);
-
-    if response.changed() {
-        if let Err(_) = value_text.parse::<T>() {
-            *value_text = old_value;
-        }
-    }
-    if response.lost_focus() {
-        if let Ok(value) = value_text.parse::<T>() {
-            if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                return Some(value);
-            }
-        }
-    }
-
-    None
-}
-
-pub fn add_rows(ui: &mut Ui, num_of_rows: i32, add_contents: impl FnOnce(&mut [Ui])) {
+pub fn add_rows<R>(ui: &mut Ui, num_of_rows: i32, add_contents: impl FnOnce(&mut [Ui]) -> R) -> R {
     ui.scope(|ui| {
         let spacing = ui.spacing().item_spacing.y;
         let total_spacing = spacing * (num_of_rows as f32 - 1.0);
@@ -51,11 +23,16 @@ pub fn add_rows(ui: &mut Ui, num_of_rows: i32, add_contents: impl FnOnce(&mut [U
             })
             .collect();
 
-        add_contents(&mut rows);
-    });
+        add_contents(&mut rows)
+    })
+    .inner
 }
 
-pub fn add_columns(ui: &mut Ui, num_of_columns: i32, add_contents: impl FnOnce(&mut [Ui])) {
+pub fn add_columns<R>(
+    ui: &mut Ui,
+    num_of_columns: i32,
+    add_contents: impl FnOnce(&mut [Ui]) -> R,
+) -> R {
     ui.scope(|ui| {
         let spacing = ui.spacing().item_spacing.x;
         let total_spacing = spacing * (num_of_columns as f32 - 1.0);
@@ -76,6 +53,7 @@ pub fn add_columns(ui: &mut Ui, num_of_columns: i32, add_contents: impl FnOnce(&
             })
             .collect();
 
-        add_contents(&mut columns);
-    });
+        add_contents(&mut columns)
+    })
+    .inner
 }
