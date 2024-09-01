@@ -14,6 +14,7 @@ use esp_idf_svc::{
     wifi::{ClientConfiguration, Configuration, EspWifi},
 };
 use headlight_if::{EchoMessage, IdentityMessage, IdentityRequestMessage, Message};
+use log::{debug, error, info, warn};
 use serializer::ByteMessagePort;
 use servo::*;
 
@@ -27,8 +28,7 @@ fn main() {
 
     // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
-
-    log::info!("Hello, world!");
+    info!("Hello, world!");
 
     let peripherals = Peripherals::take().unwrap();
     let sys_loop = EspSystemEventLoop::take().unwrap();
@@ -51,12 +51,11 @@ fn main() {
 
     while !wifi.is_connected().unwrap() {
         let config = wifi.get_configuration().unwrap();
-        println!("Waiting for station {:?}", config);
+        info!("Waiting for station {:?}", config);
         sleep(Duration::from_secs_f32(0.1));
     }
-    println!("Should be connected now");
-
-    println!("IP info: {:?}", wifi.sta_netif().get_ip_info().unwrap());
+    info!("Should be connected now");
+    info!("IP info: {:?}", wifi.sta_netif().get_ip_info().unwrap());
 
     let mdns = EspMdns::take().unwrap();
     let mut results = [QueryResult {
@@ -81,14 +80,14 @@ fn main() {
         match result {
             Ok(count) => {
                 if count == 0 {
-                    println!("No results found");
+                    warn!("No results found");
                 } else {
-                    println!("Found {:} results: {:?}", count, results[0]);
+                    info!("Found {:} results: {:?}", count, results[0]);
                 }
                 break;
             }
             Err(e) => {
-                println!("Error: {:}", e);
+                error!("Error: {:}", e);
             }
         }
     }
@@ -119,15 +118,22 @@ fn main() {
     let mut servo1 = Servo::new(
         &timer_driver,
         peripherals.ledc.channel0,
-        peripherals.pins.gpio7,
+        peripherals.pins.gpio3,
+    )
+    .unwrap();
+    let mut servo2 = Servo::new(
+        &timer_driver,
+        peripherals.ledc.channel1,
+        peripherals.pins.gpio4,
     )
     .unwrap();
 
     servo1.set_duty(0.5).unwrap();
+    servo2.set_duty(0.5).unwrap();
 
     loop {
         handler.handle(|message| {
-            println!("Command callback: {:?}", message);
+            debug!("Command callback: {:?}", message);
 
             match message {
                 Message::SetColor(set_color) => {
@@ -136,10 +142,14 @@ fn main() {
                 }
                 Message::SetServo(set_servo) => {
                     let duty = set_servo.position;
-                    servo1.set_duty(duty).unwrap();
+                    if set_servo.id == 0 {
+                        servo1.set_duty(duty).unwrap();
+                    } else if set_servo.id == 1 {
+                        servo2.set_duty(duty).unwrap();
+                    }
                 }
                 _ => {
-                    println!("Unhandled message: {:?}", message);
+                    debug!("Unhandled message: {:?}", message);
                 }
             }
 
@@ -162,20 +172,20 @@ impl CommandHandler {
     fn recv_message(&mut self) -> Message {
         match self.message_port.recv() {
             Ok(message) => {
-                println!("Received message: {:?}", message);
+                debug!("Received message: {:?}", message);
                 return message;
             }
             Err(err) => {
-                println!("Failed to receive message: {:?}", err);
+                error!("Failed to receive message: {:?}", err);
                 return Message::Invalid;
             }
         }
     }
 
     pub fn send_message(&mut self, message: Message) -> Result<(), String> {
-        println!("Sending message: {:?}", message);
+        info!("Sending message: {:?}", message);
         if let Err(err) = self.message_port.send(message) {
-            println!("Failed to send message: {:?}", err);
+            error!("Failed to send message: {:?}", err);
             return Err(err.to_string());
         }
 
@@ -189,39 +199,39 @@ impl CommandHandler {
         let message = self.recv_message();
         match &message {
             Message::Invalid => {
-                println!("Invalid message");
+                error!("Invalid message");
                 return callback(&message);
             }
 
             Message::Ack => {
-                println!("Ack not implemented");
+                warn!("Ack not implemented");
                 return callback(&message);
             }
 
             Message::Echo(echo_message) => match self.handle_echo(&echo_message) {
                 Ok(_) => {
-                    println!("Echo handled");
+                    debug!("Echo handled");
                     return callback(&message);
                 }
                 Err(err) => {
-                    println!("Failed to handle echo: {:?}", err);
+                    error!("Failed to handle echo: {:?}", err);
                     return None;
                 }
             },
 
             Message::IdentityRequest(request) => match self.handle_identity_request(&request) {
                 Ok(_) => {
-                    println!("Identity handled");
+                    debug!("Identity handled");
                     return callback(&message);
                 }
                 Err(err) => {
-                    println!("Failed to handle identity: {:?}", err);
+                    error!("Failed to handle identity: {:?}", err);
                     return None;
                 }
             },
 
             _ => {
-                println!(
+                debug!(
                     "Unhandled message by handler: {:?}. Calling callback",
                     message
                 );
@@ -231,7 +241,7 @@ impl CommandHandler {
     }
 
     fn handle_echo(&mut self, echo_message: &EchoMessage) -> Result<(), String> {
-        println!("Echo: {:?}", echo_message.message);
+        debug!("Echo: {:?}", echo_message.message);
 
         let reply = Message::EchoReply(EchoMessage {
             message: format!("Reply: {}", echo_message.message),
@@ -242,7 +252,7 @@ impl CommandHandler {
 
     fn handle_identity_request(&mut self, request: &IdentityRequestMessage) -> Result<(), String> {
         let _ = request;
-        println!("Identity Request");
+        debug!("Identity Request");
 
         let identity = Message::Identity(IdentityMessage {
             info: "ESP32".to_string(),
